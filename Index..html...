@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Indian Roblox Life Simulator — Prototype 5</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101522;color:#eef4ff;font:14px system-ui;overflow:hidden}
+#game{position:fixed;inset:0}
+#hud{position:fixed;top:10px;left:10px;right:10px;display:flex;gap:8px;flex-wrap:wrap;z-index:4;pointer-events:none}
+.pill{background:#111b2ddd;border:1px solid #4d7198;border-radius:12px;padding:8px 12px;font-weight:700}
+#phone{position:fixed;right:12px;top:75px;z-index:5;width:min(280px,72vw);max-height:75vh;background:#121b2af2;border:2px solid #5c8bc2;border-radius:22px;padding:12px;display:none;overflow:auto}
+#phone h3{margin:3px 0 10px}
+button{border:1px solid #6793c8;background:#233d60;color:white;border-radius:10px;padding:9px 10px;margin:3px;font-weight:700;cursor:pointer}
+button:active{transform:scale(.97)}
+.app{display:inline-flex;flex-direction:column;align-items:center;width:30%;margin:3px;background:#1b2a40;border-radius:12px;padding:8px 2px;font-size:12px}
+.app b{font-size:24px}
+.panel{position:fixed;z-index:6;left:50%;top:50%;transform:translate(-50%,-50%);width:min(440px,92vw);max-height:82vh;overflow:auto;background:#101a2af5;border:2px solid #6793c8;border-radius:18px;padding:16px;display:none}
+.panel h2{margin:0 0 8px}
+.row{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #30435a;padding:7px 0;gap:6px}
+.row small{color:#b8c9df}
+#controls{position:fixed;bottom:12px;left:12px;right:12px;z-index:4;display:flex;justify-content:space-between;align-items:end;pointer-events:none}
+#controls button{pointer-events:auto;min-width:52px;min-height:48px;background:#172943d9;font-size:16px}
+#stick{width:130px;height:130px;border:2px solid #7898b8aa;border-radius:50%;background:#17294377;position:relative;pointer-events:auto;touch-action:none}
+#nub{width:50px;height:50px;border-radius:50%;background:#7db7f4cc;position:absolute;left:38px;top:38px}
+#rightcontrols{display:flex;flex-wrap:wrap;justify-content:end;max-width:180px}
+#start{position:fixed;inset:0;z-index:10;background:linear-gradient(#0b1424dd,#0b1424ee);display:grid;place-items:center;text-align:center;padding:22px}
+#start article{max-width:520px}
+#start h1{font-size:clamp(24px,6vw,42px);margin:0 0 8px;color:#8fc7ff}
+#start p{line-height:1.5;color:#d4e2f2}
+#toast{position:fixed;bottom:170px;left:50%;transform:translateX(-50%);z-index:9;background:#111d2be8;padding:10px 16px;border-radius:12px;display:none;text-align:center}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+
+<div id="game"></div>
+
+<div id="hud">
+<div class="pill">🪙 Wallet: ₹<span id="cash">5000</span></div>
+<div class="pill">🎁 Bonus: +50,000</div>
+<div class="pill">📅 Day <span id="day">1</span></div>
+<div class="pill">📍 <span id="place">Home</span></div>
+</div>
+
+<div id="phone">
+<h3>📱 Kunal's Phone <button onclick="closePhone()" style="float:right">✕</button></h3>
+<div id="apps"></div>
+<div id="phonecontent"></div>
+</div>
+
+<div id="panel" class="panel">
+<h2 id="ptitle">Menu</h2>
+<div id="pbody"></div>
+<button onclick="closePanel()">Close</button>
+</div>
+
+<div id="controls">
+<div id="stick"><div id="nub"></div></div>
+<div id="rightcontrols">
+<button onclick="jump()">⬆ Jump</button>
+<button onclick="togglePhone()">📱</button>
+<button onclick="interact()">E / Interact</button>
+<button onclick="toggleRun()">🏃 Run</button>
+</div>
+</div>
+
+<div id="toast"></div>
+
+<div id="start">
+<article>
+<h1>INDIAN ROBLOX LIFE SIM</h1>
+<h2>PROTOTYPE 5</h2>
+<p>3D city life • jobs • vehicles • phone apps • business • GPS • home<br>
+Starting wallet ₹5,000 + bonus ₹50,000 coins.</p>
+<button onclick="startGame()" style="font-size:18px;padding:13px 28px">▶ START GAME</button>
+<p style="font-size:12px">For best results, open in Chrome with internet access (Three.js CDN). This is a playable single-player prototype.</p>
+</article>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+
+<script>
+let scene,camera,renderer,clock,player,avatar,car,carModel,keys={},
+cash=55000,day=1,phoneStorage=500,usedStorage=260,
+installed=['Wallet','Maps & GPS','Settings','Play Store'],
+ownedCars=[],inventory=[],bank=0,jobBusy=false,run=false,
+driving=false,food=0,hunger=100,selectedCar='Basic Hatchback',
+rental=[],business=0,taxiTarget=null,taxi=null,deliveryBike=null,
+jumpVelocity=0,graphicsMode='High',
+accountId='IN-'+Math.floor(100000000+Math.random()*900000000),
+businessLastDay=0;
+
+const mat=(c)=>new THREE.MeshStandardMaterial({color:c,roughness:.8});
+
+function saveGame(){
+try{
+localStorage.setItem('indianRobloxLifeSave',JSON.stringify({
+cash,day,phoneStorage,usedStorage,installed,ownedCars,inventory,
+bank,hunger,rental,business,businessLastDay,accountId
+}));
+}catch(e){toast('Save storage unavailable')}
+}
+
+function loadGame(){
+try{
+let d=JSON.parse(localStorage.getItem('indianRobloxLifeSave')||'null');
+if(d){
+cash=Number.isFinite(d.cash)?d.cash:55000;
+day=d.day||1;
+phoneStorage=d.phoneStorage||500;
+usedStorage=d.usedStorage||260;
+installed=Array.isArray(d.installed)?d.installed:['Wallet','Maps & GPS','Settings','Play Store'];
+ownedCars=Array.isArray(d.ownedCars)?d.ownedCars:[];
+inventory=Array.isArray(d.inventory)?d.inventory:[];
+bank=d.bank||0;
+hunger=d.hunger||100;
+rental=Array.isArray(d.rental)?d.rental:[];
+business=d.business||0;
+businessLastDay=d.businessLastDay||0;
+accountId=d.accountId||accountId;
+}
+}catch(e){console.warn('Save data could not be loaded',e)}
+}
+
+const prices={
+'Basic Hatchback':8000,'Sedan':20000,'SUV':35000,
+'Sports Car':50000,'Supercar':150000,'Hypercar':300000,
+'Phone Plus 2GB':10000,'Phone Pro 8GB':25000,
+'Phone Ultra 32GB':60000,'Gaming Phone 64GB':100000,
+'Burger':150,'Pizza':300,'Indian Thali':250,
+'Taxi Fare':200,'Fuel':300,'Repair':500,
+'Extra 500MB':2000,'Home Upgrade':15000
+};
+
+const rentRate={
+'Basic Hatchback':250,'Sedan':500,'SUV':900,
+'Sports Car':1800,'Supercar':3500,'Hypercar':6000
+};
+
+const jobs={
+'Food Delivery':600,'Taxi Driver':900,'Restaurant Worker':700,
+'Office Worker':1200,'Shop Worker':800,'Mechanic':1000,
+'Construction Worker':1100,'Security Guard':850,'Bus Driver':1300
+};
+
+const appData={
+'Food Delivery':140,'Music':90,'Jobs':110,'Taxi':160,
+'Garage':130,'Shopping':120,'Social':150,'Banking':100
+};
+
+const appIcons={
+'Wallet':'👛','Maps & GPS':'🗺️','Settings':'⚙️',
+'Play Store':'🛍️','Food Delivery':'🍔','Music':'🎵',
+'Jobs':'💼','Taxi':'🚕','Garage':'🔧',
+'Shopping':'🛒','Social':'👥','Banking':'🏦'
+};
+
+function startGame(){
+if(!window.THREE){
+toast('Three.js लोड नहीं हुआ। Internet connection और CDN check करें।');
+return;
+}
+try{
+if(!scene){
+loadGame();
+init();
+}
+document.getElementById('start').style.display='none';
+sync();
+toast('Game ready! Progress auto-save होगा।');
+}catch(e){
+console.error(e);
+scene=null;
+renderer=null;
+document.getElementById('game').innerHTML='';
+toast('Game start error: '+e.message);
+}
+}
+
+function init(){
+scene=new THREE.Scene();
+scene.background=new THREE.Color(0x9ac9ee);
+scene.fog=new THREE.Fog(0x9ac9ee,100,330);
+
+camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,600);
+
+renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+document.getElementById('game').appendChild(renderer.domElement);
+
+clock=new THREE.Clock();
+scene.add(new THREE.HemisphereLight(0xe6f5ff,0x68734b,2));
+
+let sun=new THREE.DirectionalLight(0xfff2d5,2.4);
+sun.position.set(70,110,50);
+sun.castShadow=true;
+scene.add(sun);
+
+let ground=new THREE.Mesh(new THREE.PlaneGeometry(500,500),mat(0x6c9b62));
+ground.rotation.x=-Math.PI/2;
+ground.receiveShadow=true;
+scene.add(ground);
+
+makeRoad(0,0,500,14);
+makeRoad(0,0,14,500);
+
+for(let i=-5;i<=5;i++){
+if(i===0)continue;
+makeRoad(i*38,0,9,500);
+makeRoad(0,i*38,500,9);
+}
+
+for(let x=-190;x<=190;x+=24){
+for(let z=-190;z<=190;z+=24){
+if(Math.abs(x)<25||Math.abs(z)<25)continue;
+if(Math.random()<.18)continue;
+building(x,z);
+}
+}
+
+for(let i=0;i<30;i++){
+tree((Math.random()-.5)*400,(Math.random()-.5)*400);
+}
+
+const names=[
+['HOME',-10,12,0x4d91bd],
+['MALL',28,8,0xc27bd2],
+['JOB CENTER',-30,8,0xe6a64d],
+['GARAGE',8,-30,0x6a9bca],
+['BANK',-8,-28,0x67bd9d],
+['RESTAURANT',30,-30,0xd97862],
+['PETROL',-35,-28,0xd9c15d],
+['PARK',55,35,0x6dbd78]
+];
+
+names.forEach(([n,x,z,c])=>landmark(n,x,z,c));
+
+player=new THREE.Group();
+avatar=makeAvatar();
+player.add(avatar);
+player.position.set(0,0,8);
+scene.add(player);
+
+spawnCar('Basic Hatchback',5,0);
+
+camera.position.set(0,7,15);
+camera.lookAt(player.position);
+
+refreshApps();
+renderer.domElement.addEventListener('pointerdown',()=>{});
+animate();
+}
+
+function makeRoad(x,z,w,d){
+let m=new THREE.Mesh(new THREE.PlaneGeometry(w,d),mat(0x303844));
+m.rotation.x=-Math.PI/2;
+m.position.set(x,.02,z);
+scene.add(m);
+
+if(w>d){
+for(let a=x-w/2+3;a<x+w/2;a+=12){
+let line=new THREE.Mesh(new THREE.BoxGeometry(5,.035,.18),mat(0xe8d58c));
+line.position.set(a,.05,z);
+scene.add(line);
+}
+}
+}
+
+function building(x,z){
+let h=8+Math.random()*28;
+let w=8+Math.random()*7;
+let d=8+Math.random()*7;
+let c=[0xb6b7bd,0xd7b89b,0x9ab4c8,0xd4d0b8,0xb0c1a6][Math.floor(Math.random()*5)];
+
+let b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(c));
+b.position.set(x,h/2,z);
+b.castShadow=true;
+b.receiveShadow=true;
+scene.add(b);
+
+for(let y=2;y<h-1;y+=3){
+let win=new THREE.Mesh(new THREE.BoxGeometry(w+.03,.9,.08),mat(0x3d6d90));
+win.position.set(x,y,z+d/2+.05);
+scene.add(win);
+}
+}
+
+function tree(x,z){
+let trunk=new THREE.Mesh(new THREE.CylinderGeometry(.35,.5,3,8),mat(0x76502e));
+trunk.position.set(x,1.5,z);
+scene.add(trunk);
+
+let crown=new THREE.Mesh(new THREE.SphereGeometry(2.2,9,7),mat(0x367b43));
+crown.position.set(x,4,z);
+crown.castShadow=true;
+scene.add(crown);
+}
+
+function landmark(name,x,z,color){
+let b=new THREE.Mesh(new THREE.BoxGeometry(15,7,12),mat(color));
+b.position.set(x,3.5,z);
+b.castShadow=true;
+scene.add(b);
+
+let sign=new THREE.Mesh(new THREE.BoxGeometry(12,1.4,.25),mat(0xffffff));
+sign.position.set(x,7.7,z+6.2);
+scene.add(sign);
+
+let label=makeLabel(name);
+label.position.set(x,9,z);
+scene.add(label);
+
+let zone=new THREE.Mesh(
+new THREE.CylinderGeometry(9,9,.1,20),
+new THREE.MeshBasicMaterial({color,transparent:true,opacity:.18})
+);
+zone.position.set(x,.1,z);
+scene.add(zone);
+b.userData={name,x,z};
+}
+
+function makeLabel(t){
+let c=document.createElement('canvas');
+c.width=512;
+c.height=128;
+let ctx=c.getContext('2d');
+ctx.fillStyle='#10243b';
+ctx.fillRect(0,0,512,128);
+ctx.fillStyle='white';
+ctx.font='bold 54px Arial';
+ctx.textAlign='center';
+ctx.fillText(t,256,82);
+
+let tex=new THREE.CanvasTexture(c);
+let m=new THREE.Mesh(
+new THREE.PlaneGeometry(13,3.2),
+new THREE.MeshBasicMaterial({map:tex,transparent:true,side:THREE.DoubleSide})
+);
+m.rotation.x=-.15;
+return m;
+}
+
+function makeAvatar(){
+let g=new THREE.Group();
+let skin=mat(0xc88f68);
+let shirt=mat(0x2878c9);
+let pants=mat(0x263a58);
+let hair=mat(0x29201a);
+
+let torso=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.2,.55),shirt);
+torso.position.y=1.8;
+g.add(torso);
+
+let head=new THREE.Mesh(new THREE.BoxGeometry(.8,.8,.75),skin);
+head.position.y=2.85;
+g.add(head);
+
+let h=new THREE.Mesh(new THREE.BoxGeometry(.85,.25,.8),hair);
+h.position.set(0,3.28,0);
+g.add(h);
+
+let legs=[],arms=[];
+
+for(let s of [-1,1]){
+let eye=new THREE.Mesh(new THREE.BoxGeometry(.12,.1,.04),mat(0x171717));
+eye.position.set(s*.2,2.94,.39);
+g.add(eye);
+
+let leg=new THREE.Mesh(new THREE.BoxGeometry(.42,.9,.45),pants);
+leg.position.set(s*.28,.75,0);
+g.add(leg);
+legs.push(leg);
+
+let arm=new THREE.Mesh(new THREE.BoxGeometry(.35,1,.4),skin);
+arm.position.set(s*.78,1.82,0);
+g.add(arm);
+arms.push(arm);
+}
+
+g.userData.legs=legs;
+g.userData.arms=arms;
+return g;
+}
+
+function spawnCar(name,x,z){
+if(car)scene.remove(car);
+
+car=new THREE.Group();
+
+let body=mat(
+name==='Hypercar'?0x9c35e8:
+name==='Sports Car'?0x1f73d1:0xd13d3d
+);
+
+let base=new THREE.Mesh(new THREE.BoxGeometry(2.3,.8,4.1),body);
+base.position.y=.8;
+base.castShadow=true;
+car.add(base);
+
+let cabin=new THREE.Mesh(new THREE.BoxGeometry(1.55,.8,1.8),mat(0x75a9c8));
+cabin.position.set(0,1.45,-.25);
+car.add(cabin);
+
+for(let s of [-1,1]){
+for(let z1 of [-1.35,1.35]){
+let w=new THREE.Mesh(new THREE.CylinderGeometry(.42,.42,.28,16),mat(0x202329));
+w.rotation.z=Math.PI/2;
+w.position.set(s*1.15,.45,z1);
+car.add(w);
+}
+}
+
+car.position.set(x,0,z);
+scene.add(car);
+car.userData={name,speed:0};
+}
+
+function sync(){
+document.getElementById('cash').textContent=Math.floor(cash).toLocaleString('en-IN');
+document.getElementById('day').textContent=day;
+saveGame();
+}
+
+function toast(s){
+let e=document.getElementById('toast');
+e.textContent=s;
+e.style.display='block';
+clearTimeout(window.tt);
+window.tt=setTimeout(()=>e.style.display='none',2600);
+}
+
+function openPanel(t,html){
+document.getElementById('ptitle').textContent=t;
+document.getElementById('pbody').innerHTML=html;
+document.getElementById('panel').style.display='block';
+}
+
+function closePanel(){
+document.getElementById('panel').style.display='none';
+}
+
+function togglePhone(){
+let p=document.getElementById('phone');
+p.style.display=p.style.display==='block'?'none':'block';
+refreshApps();
+}
+
+function closePhone(){
+document.getElementById('phone').style.display='none';
+document.getElementById('phonecontent').innerHTML='';
+}
+
+function refreshApps(){
+document.getElementById('apps').innerHTML=installed.map(a=>
+`<div class="app" onclick="openApp('${a}')"><b>${appIcons[a]||'📦'}</b>${a}</div>`
+).join('');
+}
+
+function openApp(a){
+let c=document.getElementById('phonecontent');
+c.innerHTML='';
+
+if(a==='Wallet')
+c.innerHTML=`<h3>Wallet</h3><p>Balance ₹${cash.toLocaleString('en-IN')}</p><button onclick="openBank()">Banking</button>`;
+
+else if(a==='Maps & GPS')
+c.innerHTML='<h3>City GPS</h3>'+['HOME','MALL','JOB CENTER','GARAGE','BANK','RESTAURANT','PETROL','PARK'].map(n=>
+`<button onclick="navigate('${n}')">${n}</button>`).join('');
+
+else if(a==='Settings')
+c.innerHTML='<h3>Settings</h3><button onclick="graphics()">Graphics: High/Low</button><button onclick="toast(\'Camera sensitivity set\')">Camera Sensitivity</button>';
+
+else if(a==='Play Store')store();
+else if(a==='Jobs')showJobs();
+else if(a==='Shopping')shop();
+
+else if(a==='Taxi')
+c.innerHTML='<h3>Taxi</h3><button onclick="callTaxi()">Call NPC Taxi — ₹200</button>';
+
+else if(a==='Food Delivery')
+c.innerHTML='<h3>Food Delivery</h3>'+['Burger','Pizza','Indian Thali'].map(n=>
+`<button onclick="orderFood('${n}')">${n} ₹${prices[n]}</button>`).join('');
+
+else if(a==='Garage')
+c.innerHTML='<h3>Garage</h3><button onclick="payAction(300,\'Fuel filled\')">Refuel ₹300</button><button onclick="payAction(500,\'Vehicle repaired\')">Repair ₹500</button><button onclick="paintCar()">Paint car ₹500</button>';
+
+else if(a==='Banking')openBank();
+
+else if(a==='Music')
+c.innerHTML='<h3>Music Player</h3><input id="audioUrl" placeholder="Direct audio URL" style="width:100%"><button onclick="playMusic()">Play</button><audio id="audio" controls style="width:100%"></audio>';
+
+else if(a==='Social')
+c.innerHTML='<h3>Social</h3><p>NPC city feed (prototype)</p><button onclick="toast(\'You posted to the city feed!\')">Create Post</button>';
+}
+
+function store(){
+let c=document.getElementById('phonecontent');
+c.innerHTML='<h3>Play Store</h3><p>Storage: '+usedStorage+' / '+phoneStorage+' MB</p>'+
+Object.entries(appData).map(([n,size])=>
+`<div class="row"><span>${appIcons[n]} ${n}<br><small>${size} MB</small></span><span>${
+installed.includes(n)?`<button onclick="uninstallApp('${n}')">Remove</button>`:
+`<button onclick="installApp('${n}')">Install ₹100</button>`
+}</span></div>`).join('')+
+'<button onclick="phoneShop()">Upgrade Phone</button>';
+}
+
+function installApp(n){
+let size=appData[n];
+if(installed.includes(n))return toast('App already installed');
+if(cash<100)return toast('Not enough coins');
+if(usedStorage+size>phoneStorage)return toast('Storage full! Upgrade phone');
+
+cash-=100;
+usedStorage+=size;
+installed.push(n);
+sync();
+refreshApps();
+store();
+toast(n+' installed');
+}
+
+function uninstallApp(n){
+if(['Wallet','Maps & GPS','Settings','Play Store'].includes(n))
+return toast('System app cannot be removed');
+
+if(!installed.includes(n))return;
+
+usedStorage=Math.max(260,usedStorage-(appData[n]||0));
+installed=installed.filter(x=>x!==n);
+saveGame();
+refreshApps();
+store();
+toast(n+' uninstalled');
+}
+
+function phoneShop(){
+openPanel('Phone Upgrade',
+Object.entries({
+'Basic 500MB':0,
+'Phone Plus 2GB':10000,
+'Phone Pro 8GB':25000,
+'Phone Ultra 32GB':60000,
+'Gaming Phone 64GB':100000
+}).map(([n,p])=>
+`<div class="row"><span>${n}</span><button onclick="upgradePhone('${n}',${p})">₹${p.toLocaleString('en-IN')}</button></div>`
+).join(''));
+}
+
+function upgradePhone(n,p){
+let cap=n.includes('500MB')?500:
+n.includes('2GB')?2048:
+n.includes('8GB')?8192:
+n.includes('32GB')?32768:65536;
+
+if(cap<usedStorage)
+return toast('Current apps need '+usedStorage+' MB. Choose a larger phone.');
+
+if(cap<=phoneStorage)
+return toast('Already using this or a larger storage tier');
+
+if(cash<p)return toast('Not enough coins');
+
+cash-=p;
+phoneStorage=cap;
+sync();
+closePanel();
+store();
+toast('Phone storage upgraded');
+}
+
+function showJobs(){
+openPanel('Jobs & Salary',
+Object.entries(jobs).map(([n,p])=>
+`<div class="row"><span>${n}<br><small>Reward ₹${p}</small></span><button onclick="startJob('${n}',${p})">Start</button></div>`
+).join(''));
+}
+
+function startJob(n,p){
+if(jobBusy)return toast('Current job is running');
+
+jobBusy=true;
+closePanel();
+toast(n+' started — complete the task!');
+
+setTimeout(()=>{
+cash+=p;
+jobBusy=false;
+sync();
+toast(n+' completed +₹'+p);
+},6500);
+}
+
+function shop(){
+openPanel('Shopping Mall',
+`<h3>Cars</h3>${
+Object.entries(prices).filter(([n])=>
+['Basic Hatchback','Sedan','SUV','Sports Car','Supercar','Hypercar'].includes(n)
+).map(([n,p])=>
+`<div class="row"><span>${n}<br><small>₹${p.toLocaleString('en-IN')}</small></span><button onclick="buyCar('${n}',${p})">Buy</button></div>`
+).join('')
+}<h3>Business</h3>
+<button onclick="buyBusiness()">Buy Taxi Business ₹25,000</button>
+<button onclick="rentMenu()">Car Rental Manager</button>`);
+}
+
+function buyCar(n,p){
+if(cash<p)return toast('Not enough coins');
+
+cash-=p;
+ownedCars.push(n);
+selectedCar=n;
+driving=false;
+if(avatar)avatar.visible=true;
+sync();
+toast(n+' purchased!');
+spawnCar(n,5,0);
+closePanel();
+}
+
+function buyBusiness(){
+if(cash<25000)return toast('Not enough coins');
+cash-=25000;
+business++;
+sync();
+toast('Taxi business purchased');
+}
+
+function rentMenu(){
+openPanel('Rental Business',
+ownedCars.length?
+ownedCars.map(n=>
+`<div class="row"><span>${n}<br><small>Daily rent ₹${rentRate[n]||250}</small></span><button onclick="listRental('${n}')">List</button></div>`
+).join(''):
+'Buy a car first');
+}
+
+function listRental(n){
+if(rental.some(r=>r.name===n))return toast('This car is already listed');
+rental.push({name:n,rate:rentRate[n]||250,last:day-1});
+saveGame();
+toast(n+' listed for rent');
+closePanel();
+}
+
+function collectRent(){
+let earned=0;
+rental.forEach(r=>{
+if(r.last<day){
+earned+=r.rate;
+r.last=day;
+}
+});
+if(!earned)return toast('Today’s rent already collected or no listings');
+cash+=earned;
+sync();
+toast('Rental income +₹'+earned);
+}
+
+function collectBusiness(){
+if(!business)return toast('No taxi business yet');
+if(businessLastDay>=day)return toast('Business income already collected today');
+
+let earned=business*900;
+cash+=earned;
+businessLastDay=day;
+sync();
+toast('Business income +₹'+earned);
+}
+
+function openBank(){
+document.getElementById('phonecontent').innerHTML=
+`<h3>🏦 Bank</h3>
+<p>Account ID: ${accountId}</p>
+<p>Wallet ₹${cash} • Bank ₹${bank}</p>
+<button onclick="deposit()">Deposit ₹1000</button>
+<button onclick="withdraw()">Withdraw ₹1000</button>
+<button onclick="toast('Virtual card issued')">Issue Virtual Card</button>
+<button onclick="toast('Card payment accepted (prototype)')">Pay by Card</button>
+<button onclick="collectRent()">Collect Rent</button>
+<button onclick="collectBusiness()">Business Income</button>`;
+}
+
+function deposit(){
+if(cash<1000)return toast('Wallet balance low');
+cash-=1000;
+bank+=1000;
+sync();
+openBank();
+}
+
+function withdraw(){
+if(bank<1000)return toast('Bank balance low');
+bank-=1000;
+cash+=1000;
+sync();
+openBank();
+}
+
+function orderFood(n){
+let p=prices[n];
+if(cash<p)return toast('Not enough coins');
+
+cash-=p;
+food++;
+sync();
+toast('Order placed. Rider delivering to home, even if you are away.');
+
+setTimeout(()=>{
+inventory.push(n);
+saveGame();
+toast(n+' delivered to Home Food Storage. Collect in inventory.');
+},4500);
+}
+
+function payAction(p,msg){
+if(cash<p)return toast('Not enough coins');
+cash-=p;
+sync();
+toast(msg);
+}
+
+function paintCar(){
+if(cash<500)return toast('Not enough coins');
+cash-=500;
+sync();
+car.children[0].material=mat(Math.random()*0xffffff);
+toast('Car painted');
+}
+
+function graphics(){
+graphicsMode=graphicsMode==='High'?'Low':'High';
+renderer.setPixelRatio(Math.min(devicePixelRatio,graphicsMode==='High'?1.5:.8));
+renderer.shadowMap.enabled=graphicsMode==='High';
+toast('Graphics: '+graphicsMode);
+}
+
+function playMusic(){
+let url=document.getElementById('audioUrl').value;
+let a=document.getElementById('audio');
+a.src=url;
+a.play().catch(()=>toast('Please use a direct audio URL'));
+}
+
+function navigate(n){
+let spots={
+'HOME':[0,8],'MALL':[28,8],'JOB CENTER':[-30,8],
+'GARAGE':[8,-30],'BANK':[-8,-28],
+'RESTAURANT':[30,-30],'PETROL':[-35,-28],'PARK':[55,35]
+};
+taxiTarget=spots[n];
+document.getElementById('place').textContent=n;
+toast('GPS route set: '+n);
+closePhone();
+}
+
+function callTaxi(){
+if(taxi)return toast('Taxi is already on its way');
+if(cash<200)return toast('Taxi fare ₹200 needed');
+
+cash-=200;
+sync();
+
+let dest=taxiTarget||[28,8];
+let model=new THREE.Group();
+
+let body=new THREE.Mesh(new THREE.BoxGeometry(2.2,.8,4),mat(0xe4c52d));
+let top=new THREE.Mesh(new THREE.BoxGeometry(1.5,.65,1.8),mat(0x9bc5dc));
+body.position.y=.8;
+top.position.set(0,1.45,-.2);
+model.add(body,top);
+
+for(let x of [-1,1]){
+for(let z of [-1.3,1.3]){
+let w=new THREE.Mesh(new THREE.CylinderGeometry(.4,.4,.25,12),mat(0x202329));
+w.rotation.z=Math.PI/2;
+w.position.set(x*1.1,.4,z);
+model.add(w);
+}
+}
+
+model.position.set(player.position.x+35,0,player.position.z+35);
+scene.add(model);
+
+taxi={
+model,
+phase:0,
+t:0,
+dest:new THREE.Vector3(dest[0],0,dest[1]),
+start:model.position.clone()
+};
+
+toast('Taxi is coming. Wait near the road.');
+}
+
+function interact(){
+if(taxi&&taxi.phase===1){
+taxi.phase=2;
+toast('Taxi ride started');
+return;
+}
+
+if(driving){
+driving=false;
+avatar.visible=true;
+player.position.x+=2;
+toast('Exited car');
+return;
+}
+
+let d=car?player.position.distanceTo(car.position):999;
+
+if(d<4){
+driving=true;
+avatar.visible=false;
+toast('Entered vehicle. Drive with controls.');
+return;
+}
+
+let spot=nearestSpot();
+
+if(spot&&spot.d<14){
+if(spot.name==='MALL')shop();
+else if(spot.name==='JOB CENTER')showJobs();
+else if(spot.name==='BANK')openBank();
+
+else if(spot.name==='RESTAURANT')
+openPanel('Restaurant',
+`<button onclick="orderFood('Burger')">Burger ₹150</button>
+<button onclick="orderFood('Pizza')">Pizza ₹300</button>`);
+
+else if(spot.name==='GARAGE')openApp('Garage');
+else if(spot.name==='PETROL')payAction(300,'Fuel filled');
+
+else if(spot.name==='HOME')
+openPanel('Home',
+'<p>Home food storage</p>'+
+inventory.map(n=>`<button onclick="eatFood('${n}')">Eat ${n}</button>`).join('')+
+'<button onclick="homeUpgrade()">Upgrade Home ₹15,000</button>');
+
+else if(spot.name==='PARK')toast('Relaxing in park');
+return;
+}
+
+toast('Nothing nearby — move to a landmark');
+}
+
+function nearestSpot(){
+let arr=[
+['HOME',-10,12],['MALL',28,8],['JOB CENTER',-30,8],
+['GARAGE',8,-30],['BANK',-8,-28],
+['RESTAURANT',30,-30],['PETROL',-35,-28],['PARK',55,35]
+];
+
+let best=null;
+
+arr.forEach(([name,x,z])=>{
+let d=Math.hypot(player.position.x-x,player.position.z-z);
+if(!best||d<best.d)best={name,d};
+});
+
+return best;
+}
+
+function eatFood(n){
+let i=inventory.indexOf(n);
+if(i<0)return;
+inventory.splice(i,1);
+hunger=Math.min(100,hunger+35);
+saveGame();
+toast('Eating animation (prototype) — Hunger '+hunger+'%');
+closePanel();
+}
+
+function homeUpgrade(){
+payAction(15000,'Home upgraded');
+closePanel();
+}
+
+function toggleRun(){
+run=!run;
+toast(run?'Run enabled':'Run disabled');
+}
+
+function jump(){
+if(player&&player.position.y<=.02)jumpVelocity=7.5;
+}
+
+let joy={x:0,y:0},
+stick=document.getElementById('stick'),
+nub=document.getElementById('nub'),
+active=false;
+
+stick.addEventListener('pointerdown',e=>{
+active=true;
+stick.setPointerCapture(e.pointerId);
+moveJoy(e);
+});
+
+stick.addEventListener('pointermove',e=>{
+if(active)moveJoy(e);
+});
+
+stick.addEventListener('pointerup',resetJoy);
+stick.addEventListener('pointercancel',resetJoy);
+
+function resetJoy(){
+active=false;
+joy.x=joy.y=0;
+nub.style.left='38px';
+nub.style.top='38px';
+}
+
+function moveJoy(e){
+let r=stick.getBoundingClientRect();
+let x=e.clientX-r.left-r.width/2;
+let y=e.clientY-r.top-r.height/2;
+let l=Math.hypot(x,y),m=42;
+
+if(l>m){x=x/l*m;y=y/l*m}
+
+joy.x=x/m;
+joy.y=y/m;
+nub.style.left=(38+x)+'px';
+nub.style.top=(38+y)+'px';
+}
+
+window.addEventListener('keydown',e=>{
+keys[e.key.toLowerCase()]=true;
+if(e.key.toLowerCase()==='e')interact();
+if(e.key.toLowerCase()==='p')togglePhone();
+if(e.key===' ')jump();
+});
+
+window.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+
+function animate(){
+requestAnimationFrame(animate);
+
+let dt=Math.min(clock.getDelta(),.05);
+
+if(player){
+let mx=joy.x+(keys.d?1:0)-(keys.a?1:0);
+let mz=joy.y+(keys.s?1:0)-(keys.w?1:0);
+
+if(driving&&car){
+let v=((keys.w||joy.y<-.2)?1:0)-((keys.s||joy.y>.2)?1:0);
+let turn=((keys.a||joy.x<-.2)?1:0)-((keys.d||joy.x>.2)?1:0);
+
+car.userData.speed+=v*dt*16;
+car.userData.speed*=Math.pow(.94,dt*60);
+car.userData.speed=THREE.MathUtils.clamp(car.userData.speed,-10,22);
+
+car.rotation.y+=turn*dt*1.5*
+(Math.abs(car.userData.speed)>.2?Math.sign(car.userData.speed):0);
+
+car.position.x+=Math.sin(car.rotation.y)*car.userData.speed*dt;
+car.position.z+=Math.cos(car.rotation.y)*car.userData.speed*dt;
+
+player.position.copy(car.position);
+player.position.y=0;
+avatar.visible=false;
+
+}else{
+avatar.visible=true;
+
+let len=Math.hypot(mx,mz);
+if(len>1){mx/=len;mz/=len}
+
+let speed=run?9:4.5;
+player.position.x+=mx*speed*dt;
+player.position.z+=mz*speed*dt;
+
+if(len>.1){
+avatar.rotation.y=Math.atan2(mx,mz);
+
+let swing=Math.sin(clock.elapsedTime*(run?13:9))*(run?.65:.35);
+avatar.userData.legs[0].rotation.x=swing;
+avatar.userData.legs[1].rotation.x=-swing;
+avatar.userData.arms[0].rotation.x=-swing*.7;
+avatar.userData.arms[1].rotation.x=swing*.7;
+
+}else{
+avatar.userData.legs.forEach(x=>x.rotation.x=0);
+avatar.userData.arms.forEach(x=>x.rotation.x=0);
+}
+}
+
+if(jumpVelocity||player.position.y>0){
+player.position.y+=jumpVelocity*dt;
+jumpVelocity-=20*dt;
+
+if(player.position.y<0){
+player.position.y=0;
+jumpVelocity=0;
+}
+}
+
+let target=new THREE.Vector3(
+player.position.x,
+player.position.y+5.5,
+player.position.z+10
+);
+
+camera.position.lerp(target,.09);
+camera.lookAt(player.position.x,player.position.y+1.4,player.position.z);
+
+document.getElementById('place').textContent=nearestSpot()?.name||'City';
+}
+
+if(taxi){
+let m=taxi.model;
+
+if(taxi.phase===0){
+let dx=player.position.x-m.position.x;
+let dz=player.position.z-m.position.z;
+let dist=Math.hypot(dx,dz);
+
+if(dist>3){
+m.position.x+=dx/dist*dt*10;
+m.position.z+=dz/dist*dt*10;
+m.rotation.y=Math.atan2(dx,dz);
+}else{
+taxi.phase=1;
+taxi.t=0;
+toast('Taxi arrived. Press E to enter.');
+}
+
+}else if(taxi.phase===2){
+let dx=taxi.dest.x-m.position.x;
+let dz=taxi.dest.z-m.position.z;
+let dist=Math.hypot(dx,dz);
+
+if(dist>2){
+m.position.x+=dx/dist*dt*12;
+m.position.z+=dz/dist*dt*12;
+m.rotation.y=Math.atan2(dx,dz);
+player.position.copy(m.position);
+}else{
+scene.remove(m);
+taxi=null;
+player.position.y=0;
+toast('Taxi ride complete. Destination reached!');
+}
+}
+}
+
+renderer.render(scene,camera);
+}
+
+window.addEventListener('resize',()=>{
+if(camera){
+camera.aspect=innerWidth/innerHeight;
+camera.updateProjectionMatrix();
+renderer.setSize(innerWidth,innerHeight);
+}
+});
+
+setInterval(()=>{
+if(scene){
+day++;
+sync();
+toast('New city day: '+day+' — rental income can be collected');
+}
+},120000);
+
+</script>
+</body>
+</html>
