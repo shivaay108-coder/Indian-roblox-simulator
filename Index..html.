@@ -1,0 +1,822 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Indian Roblox Simulator - Prototype 2</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;overflow:hidden;background:#87ceeb;font-family:Arial;color:white}
+#game{position:fixed;inset:0}
+button,select{
+  background:#132b3b;color:white;border:1px solid #45d9ff;
+  padding:10px 13px;border-radius:10px;font-weight:bold
+}
+button:active{background:#16799b}
+#top{
+ position:fixed;top:10px;left:10px;right:10px;
+ display:flex;justify-content:space-between;gap:8px;pointer-events:none
+}
+.panel{background:#071521d9;border:1px solid #36cfff;border-radius:12px;padding:10px}
+#money{font-size:16px;color:#7dffbd}
+#info{font-size:12px;margin-top:4px}
+#apps{
+ position:fixed;right:10px;top:100px;width:145px;
+ display:flex;flex-direction:column;gap:7px
+}
+#apps button{font-size:12px}
+#phone{
+ position:fixed;right:10px;bottom:10px;width:220px;
+ background:#091723ee;border:2px solid #38d9ff;
+ border-radius:20px;padding:12px;display:none
+}
+#phone h3{margin:4px 0 10px}
+#phone button,#phone select{width:100%;margin:4px 0}
+#message{
+ position:fixed;top:75px;left:50%;transform:translateX(-50%);
+ background:#061521dd;padding:10px 18px;border-radius:12px;
+ font-size:13px;text-align:center
+}
+#cameraMode{
+ position:fixed;top:50%;right:10px;transform:translateY(-50%);
+ display:flex;flex-direction:column;gap:8px
+}
+#controls{
+ position:fixed;bottom:15px;left:12px;
+ display:grid;grid-template-columns:repeat(3,58px);
+ grid-template-rows:repeat(2,52px);gap:5px
+}
+#controls button{font-size:20px;padding:5px;touch-action:none}
+#up{grid-column:2}
+#left{grid-column:1;grid-row:2}
+#down{grid-column:2;grid-row:2}
+#right{grid-column:3;grid-row:2}
+#action{
+ position:fixed;bottom:145px;left:20px;
+ display:flex;flex-direction:column;gap:7px
+}
+#action button{font-size:12px}
+#carHUD{
+ position:fixed;bottom:15px;left:50%;transform:translateX(-50%);
+ background:#071521e8;border:1px solid #43d9ff;
+ border-radius:15px;padding:12px;min-width:190px;text-align:center;
+ display:none
+}
+#speed{font-size:26px;color:#66eaff;font-weight:bold}
+#mini{
+ position:fixed;left:10px;top:95px;width:130px;height:130px;
+ border:2px solid #46dfff;border-radius:12px;background:#101d25
+}
+@media(max-width:600px){
+ #apps{top:245px;width:115px}
+ #apps button{padding:8px 5px}
+ #mini{width:105px;height:105px;top:95px}
+ #phone{width:195px}
+ #controls{bottom:12px}
+ #carHUD{bottom:12px;min-width:160px}
+}
+</style>
+</head>
+<body>
+
+<div id="game"></div>
+
+<div id="top">
+ <div class="panel">
+  <div id="money">Wallet: ₹500</div>
+  <div id="info">Indian Roblox Simulator</div>
+ </div>
+ <div class="panel">Prototype 2<br><span id="status">Explore City</span></div>
+</div>
+
+<div id="message">Welcome home!</div>
+<canvas id="mini" width="130" height="130"></canvas>
+
+<div id="apps">
+ <button id="phoneBtn">📱 Phone</button>
+ <button id="homeBtn">🏠 Home</button>
+ <button id="taxiBtn">🚕 Book Taxi</button>
+ <button id="foodBtn">🍔 Food App</button>
+ <button id="eatBtn">🍽 Eat Food</button>
+ <button id="carBtn">🚗 Enter Car</button>
+</div>
+
+<div id="phone">
+ <h3>📱 Virtual Phone</h3>
+ <button id="taxiPhone">🚕 Taxi Booking</button>
+ <button id="foodPhone">🍔 Food Delivery</button>
+ <button id="walletPhone">💰 Wallet</button>
+ <button id="closePhone">Close Phone</button>
+</div>
+
+<div id="cameraMode">
+ <button id="viewBtn">INTERIOR</button>
+ <button id="rotateBtn">360° CAMERA</button>
+</div>
+
+<div id="action">
+ <button id="jump">⬆ Jump</button>
+ <button id="interact">E - Interact</button>
+</div>
+
+<div id="controls">
+ <button id="up">▲</button>
+ <button id="left">◀</button>
+ <button id="down">▼</button>
+ <button id="right">▶</button>
+</div>
+
+<div id="carHUD">
+ <div id="speed">0 km/h</div>
+ <div id="gear">P | Dashboard</div>
+ <div style="font-size:11px;margin-top:5px">Steering: ◀ ━━━ ▶</div>
+</div>
+
+<script type="module">
+import * as THREE from
+'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.js';
+
+/* ---------------- GAME SETUP ---------------- */
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x8ed3ff);
+scene.fog=new THREE.Fog(0x8ed3ff,100,500);
+
+const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,1000);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+document.getElementById('game').appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xffffff,0x65745a,2));
+
+const sun=new THREE.DirectionalLight(0xffffff,2.2);
+sun.position.set(80,120,50);
+sun.castShadow=true;
+scene.add(sun);
+
+const mat=(color,roughness=.8)=>new THREE.MeshStandardMaterial({
+ color,roughness
+});
+
+const grass=mat(0x61934d);
+const roadMat=mat(0x333940);
+const sidewalkMat=mat(0xb9b9b9);
+const white=mat(0xffffff);
+const black=mat(0x161a20);
+const blue=mat(0x2787dc);
+const red=mat(0xd94435);
+const yellow=mat(0xffcc21);
+const glass=new THREE.MeshStandardMaterial({
+ color:0x8bd9ff,roughness:.2,metalness:.1,
+ transparent:true,opacity:.38
+});
+
+function box(parent,x,y,z,w,h,d,material){
+ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);
+ m.position.set(x,y,z);
+ m.castShadow=true;
+ m.receiveShadow=true;
+ parent.add(m);
+ return m;
+}
+
+function cylinder(parent,x,y,z,r,h,material,segments=16){
+ const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,segments),material);
+ m.position.set(x,y,z);
+ m.castShadow=true;
+ parent.add(m);
+ return m;
+}
+
+const ground=box(scene,0,-.5,0,500,1,500,grass);
+
+/* ---------------- CITY ---------------- */
+
+const roadPositions=[];
+for(let i=-100;i<=100;i+=50){
+ roadPositions.push(i);
+ box(scene,i,.01,0,12,.12,500,roadMat);
+ box(scene,0,.01,i,500,.12,12,roadMat);
+ box(scene,i, .08,0,1,.08,500,sidewalkMat);
+ box(scene,0,.08,i,500,.08,1,sidewalkMat);
+}
+
+function building(x,z,w,d,h,color){
+ const group=new THREE.Group();
+ group.position.set(x,0,z);
+ scene.add(group);
+
+ box(group,0,h/2,0,w,h,d,mat(color));
+ box(group,0,h+.5,0,w+.5,1,d+.5,mat(0x50545a));
+
+ for(let y=2;y<h;y+=3){
+  for(let xx=-w/2+1;xx<w/2;xx+=3){
+   box(group,xx,y,d/2+.05,1.1,1.3,.1,glass);
+   box(group,xx,y,-d/2-.05,1.1,1.3,.1,glass);
+  }
+ }
+ box(group,0,1.2,d/2+.1,w*.4,2,.2,mat(0x3c2921));
+ return group;
+}
+
+for(let x=-100;x<=100;x+=25){
+ for(let z=-100;z<=100;z+=25){
+  if(Math.abs(x)%50<10 || Math.abs(z)%50<10)continue;
+  if(Math.abs(x)<25&&Math.abs(z)<25)continue;
+  const h=6+Math.random()*15;
+  building(x,z,10,10,h,
+   [0xd7b89a,0xd5dce5,0xc6b6a1,0x9daab5][Math.floor(Math.random()*4)]);
+ }
+}
+
+/* Named places */
+building(-30,30,20,16,12,0xe4d7b8); // hospital
+building(30,30,18,16,10,0x8fa4b9);  // police
+building(-30,-30,20,15,9,0xc5b9a4); // school
+building(30,-30,16,16,7,0xd8b477);  // garage
+building(0,75,18,15,8,0xe4c19c);     // market
+
+/* ---------------- HOME ---------------- */
+
+const home=new THREE.Group();
+home.position.set(15,0,15);
+scene.add(home);
+
+box(home,0,3,0,12,6,12,mat(0xd6a779));
+box(home,0,6.5,0,14,1,14,mat(0x743a32));
+box(home,0,1.5,6.1,3,3,.3,mat(0x56362a));
+box(home,-3,3,6.15,2,2,.2,glass);
+box(home,3,3,6.15,2,2,.2,glass);
+
+const homeMarker=new THREE.Sprite(new THREE.SpriteMaterial({
+ map:new THREE.CanvasTexture(makeMarker('HOME')),
+ transparent:true
+}));
+homeMarker.position.set(15,10,15);
+homeMarker.scale.set(8,4,1);
+scene.add(homeMarker);
+
+function makeMarker(text){
+ const c=document.createElement('canvas');
+ c.width=256;c.height=96;
+ const ctx=c.getContext('2d');
+ ctx.fillStyle='#092333';
+ ctx.fillRect(0,0,256,96);
+ ctx.strokeStyle='#39dcff';ctx.lineWidth=6;
+ ctx.strokeRect(3,3,250,90);
+ ctx.fillStyle='white';ctx.font='bold 38px Arial';
+ ctx.textAlign='center';ctx.fillText(text,128,60);
+ return c;
+}
+
+/* ---------------- PLAYER ---------------- */
+
+const player=new THREE.Group();
+scene.add(player);
+player.position.set(15,0,24);
+
+const body=box(player,0,1.4,0,1.1,1.4,.65,blue);
+box(player,0,2.4,0,.85,.85,.85,mat(0xf1c49b));
+box(player,0,.65,0,.8,.6,.6,black);
+box(player,-.4,.2,0,.3,.6,.35,black);
+box(player,.4,.2,0,.3,.6,.35,black);
+
+let inCar=false;
+let car=null;
+let taxi=null;
+let taxiDriver=null;
+let delivery=null;
+let foodInventory=0;
+let wallet=500;
+let speed=0;
+let yaw=0;
+let pitch=.18;
+let cameraInterior=false;
+let targetDestination=new THREE.Vector3(75,0,75);
+let moving=false;
+let playerVisible=true;
+
+const keys={};
+let movement={forward:0,back:0,left:0,right:0};
+
+addEventListener('keydown',e=>{
+ keys[e.key.toLowerCase()]=true;
+ if(e.key.toLowerCase()==='e')interact();
+ if(e.key.toLowerCase()==='v')toggleView();
+});
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+
+/* ---------------- CAR ---------------- */
+
+function createCar(color=0x247bcb){
+ const g=new THREE.Group();
+
+ box(g,0,.65,0,2.5,.7,4.8,mat(color,.3));
+ box(g,0,1.35,-.3,1.9,1.2,2.4,mat(color,.25));
+
+ // Windows
+ box(g,0,1.45,.95,1.8,.9,.08,glass);
+ box(g,0,1.45,-1.5,1.8,.9,.08,glass);
+ box(g,-.95,1.45,-.3,.08,.9,2.2,glass);
+ box(g,.95,1.45,-.3,.08,.9,2.2,glass);
+
+ // Wheels
+ for(const x of [-1.25,1.25]){
+  for(const z of [-1.55,1.55]){
+   const wheel=cylinder(g,x,.35,z,.42,.28,black,20);
+   wheel.rotation.z=Math.PI/2;
+  }
+ }
+
+ // Interior seats
+ box(g,-.55,1,-.3,.65,.8,.65,black);
+ box(g,.55,1,-.3,.65,.8,.65,black);
+ box(g,0,1,-1.1,1.3,.6,.5,black);
+
+ // Dashboard
+ box(g,0,1.1,1.05,1.9,.35,.3,black);
+
+ // Steering wheel
+ const steering=new THREE.Mesh(
+  new THREE.TorusGeometry(.36,.06,8,24),black
+ );
+ steering.position.set(-.55,1.25,.9);
+ steering.rotation.x=Math.PI/2;
+ g.add(steering);
+
+ // Speed indicator
+ const dial=new THREE.Group();
+ dial.position.set(.3,1.35,.9);
+ g.add(dial);
+ cylinder(dial,0,0,0,.2,.05,mat(0x101820),24);
+ const needle=box(dial,0,.12,.04,.035,.23,.05,red);
+ needle.rotation.z=-.4;
+
+ // Windshield view frame
+ box(g,0,2,1.1,2,.12,.12,black);
+
+ g.userData={steering,needle};
+ return g;
+}
+
+car=createCar();
+car.position.set(20,0,24);
+scene.add(car);
+
+/* ---------------- CAMERA ---------------- */
+
+let cameraDistance=8;
+let dragActive=false;
+let lastX=0,lastY=0;
+
+renderer.domElement.addEventListener('pointerdown',e=>{
+ dragActive=true;
+ lastX=e.clientX;lastY=e.clientY;
+ renderer.domElement.setPointerCapture(e.pointerId);
+});
+renderer.domElement.addEventListener('pointerup',()=>dragActive=false);
+renderer.domElement.addEventListener('pointercancel',()=>dragActive=false);
+renderer.domElement.addEventListener('pointermove',e=>{
+ if(!dragActive)return;
+ const dx=e.clientX-lastX;
+ const dy=e.clientY-lastY;
+ lastX=e.clientX;lastY=e.clientY;
+ yaw-=dx*.005;
+ pitch=Math.max(-.45,Math.min(1.1,pitch+dy*.003));
+});
+
+function toggleView(){
+ cameraInterior=!cameraInterior;
+ document.getElementById('viewBtn').textContent=
+ cameraInterior?'EXTERIOR':'INTERIOR';
+}
+
+document.getElementById('viewBtn').onclick=toggleView;
+
+document.getElementById('rotateBtn').onclick=()=>{
+ message('Drag the screen to rotate camera 360°');
+};
+
+/* ---------------- TAXI SYSTEM ---------------- */
+
+function createTaxi(){
+ const t=createCar(0xffd52d);
+ scene.add(t);
+ t.position.set(-100,0,-100);
+ return t;
+}
+
+function createDriver(color=0xf0c39b){
+ const d=new THREE.Group();
+ box(d,0,1.2,0,.8,1.2,.6,mat(0x222f47));
+ box(d,0,2,0,.7,.7,.7,mat(color));
+ box(d,-.3,.4,0,.25,.8,.3,black);
+ box(d,.3,.4,0,.25,.8,.3,black);
+ scene.add(d);
+ return d;
+}
+
+let taxiState='idle';
+let taxiTimer=0;
+let taxiFare=100;
+let taxiTarget=new THREE.Vector3(75,0,75);
+let taxiBooked=false;
+let taxiBoarding=false;
+
+function bookTaxi(){
+ if(taxiBooked){
+  message('Taxi already booked!');
+  return;
+ }
+ taxiBooked=true;
+ taxiState='coming';
+ taxiTimer=10;
+ taxiTarget=targetDestination.clone();
+
+ taxi=createTaxi();
+ taxiDriver=createDriver();
+ taxi.position.set(-80,0,15);
+ taxiDriver.position.copy(taxi.position);
+
+ message('Taxi booked! Driver is coming...');
+}
+
+function moveToward(obj,target,velocity){
+ const dx=target.x-obj.position.x;
+ const dz=target.z-obj.position.z;
+ const dist=Math.sqrt(dx*dx+dz*dz);
+ if(dist<.5)return true;
+ const step=Math.min(velocity,dist);
+ obj.position.x+=dx/dist*step;
+ obj.position.z+=dz/dist*step;
+ obj.rotation.y=Math.atan2(dx,dz);
+ return false;
+}
+
+function taxiUpdate(dt){
+ if(!taxiBooked||!taxi)return;
+
+ if(taxiState==='coming'){
+  taxiTimer-=dt;
+  if(taxiTimer<=0){
+   taxiState='drivingToPickup';
+   message('Taxi is on the road!');
+  }
+ }
+
+ if(taxiState==='drivingToPickup'){
+  const pickup=new THREE.Vector3(player.position.x,0,player.position.z);
+  if(moveToward(taxi,pickup,dt*8)){
+   taxiState='driverWalking';
+   taxiDriver.position.copy(taxi.position);
+   message('Taxi arrived. Driver is getting out!');
+  }
+ }
+
+ if(taxiState==='driverWalking'){
+  const door=new THREE.Vector3(taxi.position.x+2,0,taxi.position.z);
+  if(moveToward(taxiDriver,door,dt*2)){
+   taxiState='boarding';
+   taxiBoarding=true;
+   message('Driver opens door. Boarding taxi...');
+   setTimeout(()=>{
+    playerVisible=false;
+    player.visible=false;
+    taxiState='toDestination';
+    message('Taxi driving to destination...');
+   },1800);
+  }
+ }
+
+ if(taxiState==='toDestination'){
+  taxi.position.y=0;
+  const arrived=moveToward(taxi,taxiTarget,dt*9);
+  if(arrived){
+   taxiState='arrived';
+   message('Destination reached! Driver opens door.');
+   setTimeout(()=>{
+    player.visible=true;
+    playerVisible=true;
+    player.position.set(taxi.position.x+2,0,taxi.position.z);
+    wallet=Math.max(0,wallet-taxiFare);
+    updateWallet();
+    taxiState='done';
+    taxiBooked=false;
+    taxiBoarding=false;
+    message('You reached destination. Fare ₹'+taxiFare);
+   },2200);
+  }
+ }
+
+ if(taxiState==='done'){
+  scene.remove(taxi);
+  scene.remove(taxiDriver);
+  taxi=null;taxiDriver=null;
+  taxiState='idle';
+ }
+}
+
+/* ---------------- FOOD DELIVERY ---------------- */
+
+function bookFood(){
+ if(delivery){
+  message('Delivery is already in progress!');
+  return;
+ }
+ const cost=80;
+ if(wallet<cost){
+  message('Not enough money!');
+  return;
+ }
+ wallet-=cost;
+ updateWallet();
+ foodInventory++;
+ delivery=createDriver(0xf1c49b);
+ delivery.position.set(-80,0,15);
+ delivery.userData.target=new THREE.Vector3(15,0,24);
+ delivery.userData.timer=10;
+ delivery.userData.state='coming';
+ message('Food ordered! Delivery person is coming.');
+}
+
+function deliveryUpdate(dt){
+ if(!delivery)return;
+ const state=delivery.userData.state;
+
+ if(state==='coming'){
+  delivery.userData.timer-=dt;
+  if(delivery.userData.timer<=0){
+   delivery.userData.state='approaching';
+   message('Food delivery person is approaching your home!');
+  }
+ }
+
+ if(delivery.userData.state==='approaching'){
+  if(moveToward(delivery,delivery.userData.target,dt*3)){
+   delivery.userData.state='knocking';
+   message('Doorbell! Your food has arrived.');
+   setTimeout(()=>{
+    if(delivery){
+     delivery.userData.state='handing';
+     message('Food package handed over!');
+    }
+   },2000);
+   setTimeout(()=>{
+    if(delivery){
+     scene.remove(delivery);
+     delivery=null;
+     message('Food added to inventory.');
+    }
+   },4500);
+  }
+ }
+}
+
+/* ---------------- INTERACTION ---------------- */
+
+function interact(){
+ if(inCar){
+  inCar=false;
+  player.visible=true;
+  player.position.set(car.position.x+2,0,car.position.z);
+  document.getElementById('carHUD').style.display='none';
+  message('Exited car');
+  return;
+ }
+
+ const distance=player.position.distanceTo(car.position);
+ if(distance<5){
+  inCar=true;
+  player.visible=false;
+  car.position.y=0;
+  message('Entered car. Choose Interior or Exterior view.');
+  document.getElementById('carHUD').style.display='block';
+  return;
+ }
+
+ const homeDistance=player.position.distanceTo(home.position);
+ if(homeDistance<15){
+  message('You are at your home!');
+  return;
+ }
+
+ message('Nothing nearby to interact with.');
+}
+
+document.getElementById('interact').onclick=interact;
+document.getElementById('carBtn').onclick=interact;
+
+/* ---------------- BUTTONS ---------------- */
+
+function bindMove(id,property){
+ const el=document.getElementById(id);
+ el.addEventListener('pointerdown',e=>{
+  e.preventDefault();movement[property]=1;
+ });
+ el.addEventListener('pointerup',()=>movement[property]=0);
+ el.addEventListener('pointerleave',()=>movement[property]=0);
+ el.addEventListener('pointercancel',()=>movement[property]=0);
+}
+
+bindMove('up','forward');
+bindMove('down','back');
+bindMove('left','left');
+bindMove('right','right');
+
+document.getElementById('jump').onclick=()=>{
+ if(!inCar){
+  player.position.y=2;
+  setTimeout(()=>player.position.y=0,500);
+ }
+};
+
+document.getElementById('taxiBtn').onclick=bookTaxi;
+document.getElementById('taxiPhone').onclick=bookTaxi;
+document.getElementById('foodBtn').onclick=bookFood;
+document.getElementById('foodPhone').onclick=bookFood;
+
+document.getElementById('phoneBtn').onclick=()=>{
+ document.getElementById('phone').style.display='block';
+};
+document.getElementById('closePhone').onclick=()=>{
+ document.getElementById('phone').style.display='none';
+};
+document.getElementById('homeBtn').onclick=()=>{
+ player.position.set(15,0,24);
+ message('Returned to Home');
+};
+
+document.getElementById('walletPhone').onclick=()=>{
+ message('Virtual Wallet: ₹'+wallet);
+};
+
+document.getElementById('eatBtn').onclick=()=>{
+ if(foodInventory>0){
+  foodInventory--;
+  message('Eating food animation!');
+  player.rotation.y+=.4;
+  setTimeout(()=>message('Food finished!'),2500);
+ }else{
+  message('No food in inventory. Order from Food App.');
+ }
+};
+
+function updateWallet(){
+ document.getElementById('money').textContent='Wallet: ₹'+wallet;
+}
+
+/* ---------------- PLAYER / CAR MOVEMENT ---------------- */
+
+function updatePlayer(dt){
+ if(inCar){
+  const acceleration=movement.forward||keys['w']?1:0;
+  const braking=movement.back||keys['s']?1:0;
+  const steering=(movement.left||keys['a']?1:0)-
+                 (movement.right||keys['d']?1:0);
+
+  speed+=acceleration*dt*15;
+  speed-=braking*dt*20;
+  speed*=.99;
+  speed=Math.max(0,Math.min(50,speed));
+
+  car.rotation.y+=steering*dt*(speed*.025+.2);
+  car.position.x+=Math.sin(car.rotation.y)*speed*dt;
+  car.position.z+=Math.cos(car.rotation.y)*speed*dt;
+
+  const needle=car.userData.needle;
+  needle.rotation.z=-speed/50*2;
+
+  document.getElementById('speed').textContent=
+  Math.round(speed*3.6)+' km/h';
+
+  document.getElementById('gear').textContent=
+  speed>1?'D | Dashboard':'P | Dashboard';
+
+ }else{
+  const forward=(movement.forward||keys['w']?1:0)-
+                (movement.back||keys['s']?1:0);
+  const side=(movement.right||keys['d']?1:0)-
+             (movement.left||keys['a']?1:0);
+
+  const dir=new THREE.Vector3(
+   Math.sin(yaw)*forward+Math.cos(yaw)*side,
+   0,
+   Math.cos(yaw)*forward-Math.sin(yaw)*side
+  );
+
+  if(dir.length()>0){
+   dir.normalize();
+   player.position.x+=dir.x*dt*7;
+   player.position.z+=dir.z*dt*7;
+   player.rotation.y=Math.atan2(dir.x,dir.z);
+  }
+ }
+}
+
+/* ---------------- MINIMAP ---------------- */
+
+const mini=document.getElementById('mini');
+const ctx=mini.getContext('2d');
+
+function drawMini(){
+ ctx.fillStyle='#314438';
+ ctx.fillRect(0,0,130,130);
+
+ ctx.strokeStyle='#747c82';
+ ctx.lineWidth=7;
+
+ for(let i=-100;i<=100;i+=50){
+  let x=65+i*.45;
+  let y=65+i*.45;
+  ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,130);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(130,y);ctx.stroke();
+ }
+
+ function dot(x,z,color,label){
+  const px=65+x*.45;
+  const py=65+z*.45;
+  ctx.fillStyle=color;
+  ctx.beginPath();ctx.arc(px,py,4,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='white';ctx.font='9px Arial';
+  ctx.fillText(label,px+4,py-4);
+ }
+
+ dot(15,15,'#00ffb0','HOME');
+ dot(-30,30,'#ffffff','H');
+ dot(30,30,'#ff4444','P');
+ dot(-30,-30,'#ffff00','S');
+ dot(30,-30,'#00dfff','G');
+ dot(0,75,'#ff9900','M');
+
+ const p=inCar?car.position:player.position;
+ dot(p.x,p.z,'#ff2dff','YOU');
+}
+
+/* ---------------- CAMERA UPDATE ---------------- */
+
+function cameraUpdate(dt){
+ if(inCar&&cameraInterior){
+  // First-person view from driver seat through windshield
+  const offset=new THREE.Vector3(-.55,1.55,1.0);
+  offset.applyAxisAngle(new THREE.Vector3(0,1,0),car.rotation.y);
+  camera.position.copy(car.position).add(offset);
+
+  const look=new THREE.Vector3(
+   car.position.x+Math.sin(car.rotation.y)*20,
+   car.position.y+1.5,
+   car.position.z+Math.cos(car.rotation.y)*20
+  );
+  camera.lookAt(look);
+
+ }else{
+  const target=inCar?car.position:player.position;
+  const distance=inCar?9:8;
+
+  const cx=target.x-Math.sin(yaw)*Math.cos(pitch)*distance;
+  const cz=target.z-Math.cos(yaw)*Math.cos(pitch)*distance;
+  const cy=target.y+2+Math.sin(pitch)*distance;
+
+  camera.position.lerp(new THREE.Vector3(cx,cy,cz),.12);
+  camera.lookAt(target.x,target.y+1.3,target.z);
+ }
+}
+
+/* ---------------- GAME LOOP ---------------- */
+
+let previous=performance.now();
+
+function animate(now){
+ requestAnimationFrame(animate);
+
+ const dt=Math.min((now-previous)/1000,.05);
+ previous=now;
+
+ updatePlayer(dt);
+ taxiUpdate(dt);
+ deliveryUpdate(dt);
+ cameraUpdate(dt);
+ drawMini();
+
+ renderer.render(scene,camera);
+}
+
+animate(performance.now());
+
+addEventListener('resize',()=>{
+ camera.aspect=innerWidth/innerHeight;
+ camera.updateProjectionMatrix();
+ renderer.setSize(innerWidth,innerHeight);
+});
+
+function message(text){
+ document.getElementById('message').textContent=text;
+}
+
+</script>
+</body>
+</html>
