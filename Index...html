@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Indian Roblox Simulator - Prototype 4</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;overflow:hidden;background:#0b1220;color:#fff;font-family:Arial}
+button{cursor:pointer;border:0;border-radius:10px;padding:10px;color:white;background:#087ec3}
+button:active{transform:scale(.96)}
+button:disabled{opacity:.35}
+canvas{display:block}
+#hud{position:fixed;top:10px;left:10px;background:#081525dd;border:1px solid #38bdf8;border-radius:12px;padding:10px;z-index:3;font-size:12px;line-height:1.8}
+#phoneBtn{position:fixed;right:15px;bottom:20px;width:68px;height:68px;border-radius:22px;background:linear-gradient(145deg,#38bdf8,#075985);font-size:30px;z-index:4}
+#panel{display:none;position:fixed;z-index:10;right:8px;top:8px;bottom:8px;width:min(390px,96vw);background:#101a2af5;border:1px solid #38bdf8;border-radius:22px;overflow:auto;padding:14px}
+#panel h2{margin:5px 0 15px;color:#7dd3fc}
+#panel .close{float:right;background:#dc2626}
+#panel button{margin:4px}
+.card{border:1px solid #334155;background:linear-gradient(145deg,#1e293b,#101827);border-radius:15px;padding:12px;margin:9px 0}
+.appgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.app{background:#172338;border:1px solid #334155;border-radius:15px;padding:12px 4px;text-align:center;min-height:90px}
+.appicon{font-size:32px;display:block;margin-bottom:7px}
+.appname{font-size:12px}
+#message{position:fixed;bottom:110px;left:50%;transform:translateX(-50%);background:#020617ed;border:1px solid #38bdf8;border-radius:13px;padding:12px;z-index:7;display:none;text-align:center;max-width:90vw}
+#controls{position:fixed;left:12px;bottom:12px;display:grid;grid-template-columns:50px 50px 50px;gap:5px;z-index:4}
+#controls button{height:48px;background:#0b2238dd;border:1px solid #38bdf8;font-size:20px}
+#actions{position:fixed;left:12px;bottom:175px;z-index:4}
+#actions button{display:block;margin:5px;background:#075985}
+#start{position:fixed;inset:0;z-index:20;background:linear-gradient(130deg,#020617,#12345a,#020617);display:flex;align-items:center;justify-content:center;text-align:center;padding:20px}
+#start button{font-size:20px;padding:16px 30px;background:#0284c7}
+input,select{background:#0b1220;color:white;border:1px solid #38bdf8;padding:10px;border-radius:8px;width:100%;margin:5px 0}
+#tripHUD{position:fixed;top:12px;right:12px;z-index:4;background:#081525dd;border-radius:12px;padding:10px;display:none}
+</style>
+</head>
+<body>
+
+<div id="start">
+ <div>
+  <h1>🇮🇳 INDIAN CITY LIFE</h1>
+  <h2>Roblox Simulator — Prototype 4</h2>
+  <p>Open World • Jobs • Taxi • Rental Business • Banking</p>
+  <button onclick="startGame()">▶ PLAY GAME</button>
+ </div>
+</div>
+
+<div id="hud">
+ <b>🏙️ CITY LIFE</b><br>
+ Wallet: ₹<span id="wallet">5000</span><br>
+ Bank: ₹<span id="bank">0</span><br>
+ Car: <span id="carName">Starter Hatchback</span><br>
+ Fuel: <span id="fuel">100</span>%<br>
+ Phone: <span id="storage">260/500</span> MB
+</div>
+
+<div id="tripHUD">
+ 🚕 Taxi Journey<br>
+ Destination: <span id="tripDest">--</span><br>
+ <span id="tripStatus">Driver approaching...</span>
+</div>
+
+<button id="phoneBtn" onclick="openPhone()">📱</button>
+
+<div id="controls">
+ <div></div><button onpointerdown="move('forward')" onpointerup="stopMove()">▲</button><div></div>
+ <button onpointerdown="move('left')" onpointerup="stopMove()">◀</button>
+ <button onpointerdown="move('back')" onpointerup="stopMove()">▼</button>
+ <button onpointerdown="move('right')" onpointerup="stopMove()">▶</button>
+</div>
+
+<div id="actions">
+ <button onclick="jump()">🦘 JUMP</button>
+ <button onclick="toggleCar()">🚗 ENTER / EXIT</button>
+</div>
+
+<div id="panel">
+ <button class="close" onclick="closePanel()">✕</button>
+ <div id="content"></div>
+</div>
+
+<div id="message"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+<script>
+/* INDIAN ROBLOX SIMULATOR PROTOTYPE 4
+   Mobile-first 3D game prototype
+*/
+
+let scene,camera,renderer,player,car,carBody,driver,taxiBike;
+let started=false,driving=false,moveDir="";
+let wallet=5000,bank=0,fuel=100;
+let phoneStorage=500,usedStorage=260;
+let bankCard=false;
+let bankID="IND-"+Math.floor(100000+Math.random()*900000);
+let currentCar="Starter Hatchback";
+let ownedCars=["Starter Hatchback"];
+let installed=["Wallet","Maps & GPS","Settings","Play Store"];
+let rentalListings={},rentalIncome=0;
+let inventory=[],homeFood=[];
+let playerVelocity=new THREE.Vector3();
+let verticalVelocity=0,onGround=true;
+let carVelocity=0;
+let taxiState="idle",taxi=null,taxiDriver=null,taxiDestination=null;
+let taxiTarget=new THREE.Vector3();
+let deliveryState="idle",deliveryBike=null,deliveryRider=null;
+let graphics="Medium";
+let tripTime=0;
+let taxiFare=200;
+
+const appData=[
+ ["Wallet","💰",35,true],
+ ["Maps & GPS","🗺️",120,true],
+ ["Settings","⚙️",25,true],
+ ["Play Store","🛍️",80,true],
+ ["Food Delivery","🍔",140,false],
+ ["Music","🎵",90,false],
+ ["Jobs","💼",110,false],
+ ["Taxi","🚕",160,false],
+ ["Garage","🔧",130,false],
+ ["Shopping","🛒",120,false],
+ ["Social","👥",150,false],
+ ["Banking","🏦",100,false]
+];
+
+const cars=[
+ {name:"Starter Hatchback",price:0,speed:12,rentMin:150,rentMax:350},
+ {name:"City Sedan",price:20000,speed:18,rentMin:300,rentMax:650},
+ {name:"Family SUV",price:50000,speed:24,rentMin:500,rentMax:1000},
+ {name:"Sports Car",price:100000,speed:35,rentMin:900,rentMax:1800},
+ {name:"Supercar",price:250000,speed:45,rentMin:1500,rentMax:3000},
+ {name:"Hypercar",price:500000,speed:60,rentMin:2500,rentMax:5000}
+];
+
+const phones=[
+ {name:"Basic Phone",price:0,storage:500},
+ {name:"Phone Plus",price:10000,storage:2000},
+ {name:"Pro Phone",price:25000,storage:8000},
+ {name:"Ultra Phone",price:60000,storage:32000},
+ {name:"Gaming Phone",price:100000,storage:64000}
+];
+
+const places=[
+ {name:"My Home",x:0,z:0},
+ {name:"City Restaurant",x:50,z:-35},
+ {name:"Shopping Mall",x:-50,z:40},
+ {name:"Petrol Pump",x:80,z:20},
+ {name:"City Bank",x:-80,z:-20},
+ {name:"City Park",x:30,z:70},
+ {name:"Car Showroom",x:-30,z:-70},
+ {name:"Office Building",x:100,z:-80}
+];
+
+function startGame(){
+ document.getElementById("start").style.display="none";
+ started=true;
+ init3D();
+ updateHUD();
+ toast("Welcome to your Indian city!");
+}
+
+function init3D(){
+ scene=new THREE.Scene();
+ scene.background=new THREE.Color(0x8bd4ff);
+ scene.fog=new THREE.Fog(0x8bd4ff,100,450);
+
+ camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,1000);
+ renderer=new THREE.WebGLRenderer({antialias:true});
+ renderer.setSize(innerWidth,innerHeight);
+ renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
+ renderer.shadowMap.enabled=true;
+ renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+ document.body.appendChild(renderer.domElement);
+
+ scene.add(new THREE.HemisphereLight(0xffffff,0x45634c,2));
+ let sun=new THREE.DirectionalLight(0xffffff,2.3);
+ sun.position.set(80,100,50);
+ sun.castShadow=true;
+ scene.add(sun);
+
+ buildCity();
+ createPlayer();
+ createPlayerCar();
+
+ camera.position.set(0,5,10);
+ window.addEventListener("resize",()=>{
+ camera.aspect=innerWidth/innerHeight;
+ camera.updateProjectionMatrix();
+ renderer.setSize(innerWidth,innerHeight);
+ });
+ animate();
+}
+
+function material(color,rough=.8){
+ return new THREE.MeshStandardMaterial({color,roughness:rough});
+}
+
+function buildCity(){
+ let ground=new THREE.Mesh(new THREE.PlaneGeometry(1000,1000),material(0x5b9d57));
+ ground.rotation.x=-Math.PI/2;
+ ground.receiveShadow=true;
+ scene.add(ground);
+
+ // Roads
+ for(let p=-200;p<=200;p+=50){
+ let road=new THREE.Mesh(new THREE.BoxGeometry(500,.12,13),material(0x343a40));
+ road.position.set(0,.06,p);
+ scene.add(road);
+ let road2=new THREE.Mesh(new THREE.BoxGeometry(13,.12,500),material(0x343a40));
+ road2.position.set(p,.06,0);
+ scene.add(road2);
+ }
+
+ // Road markings
+ for(let p=-200;p<=200;p+=15){
+ let line=new THREE.Mesh(new THREE.BoxGeometry(4,.03,.25),material(0xffffff));
+ line.position.set(p,.14,0);
+ scene.add(line);
+ }
+
+ // Building blocks, not placed across the roads
+ for(let x=-175;x<=175;x+=50){
+ for(let z=-175;z<=175;z+=50){
+ if(Math.abs(x)<30&&Math.abs(z)<30)continue;
+ let h=10+Math.random()*30;
+ let w=14+Math.random()*10;
+ let d=14+Math.random()*10;
+ let colors=[0xf4c7a1,0xe8e5d8,0xb9dce9,0xf1b4b4,0xc5d9a4,0xc8b8e9];
+ let building=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),
+ material(colors[Math.floor(Math.random()*colors.length)]));
+ building.position.set(x,h/2,z);
+ building.castShadow=true;
+ building.receiveShadow=true;
+ scene.add(building);
+
+ // Window panels
+ for(let yy=3;yy<h-2;yy+=4){
+ for(let xx=-w/2+2;xx<w/2-1;xx+=3){
+ let win=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.2,.12),material(0x65c9ff,.3));
+ win.position.set(x+xx,yy,z+d/2+.08);
+ scene.add(win);
+ }
+ }
+ }
+ }
+
+ // Park
+ let park=new THREE.Mesh(new THREE.BoxGeometry(35,.2,35),material(0x208a45));
+ park.position.set(30,.15,70);
+ scene.add(park);
+
+ for(let i=0;i<25;i++){
+ let x=30+(Math.random()-.5)*30;
+ let z=70+(Math.random()-.5)*30;
+ let trunk=new THREE.Mesh(new THREE.CylinderGeometry(.35,.5,3),material(0x795548));
+ trunk.position.set(x,1.5,z);scene.add(trunk);
+ let leaves=new THREE.Mesh(new THREE.SphereGeometry(2.3,8,8),material(0x12813d));
+ leaves.position.set(x,4,z);scene.add(leaves);
+ }
+
+ // Destination markers
+ places.forEach(p=>{
+ let marker=new THREE.Mesh(new THREE.CylinderGeometry(.8,.8,.25,16),material(0xffd700));
+ marker.position.set(p.x,.3,p.z);
+ scene.add(marker);
+ });
+}
+
+function createPlayer(){
+ player=new THREE.Group();
+ let torso=new THREE.Mesh(new THREE.BoxGeometry(1,1.3,.6),material(0x2563eb));
+ torso.position.y=1.25;torso.castShadow=true;
+ player.add(torso);
+
+ let head=new THREE.Mesh(new THREE.BoxGeometry(.75,.75,.75),material(0xf1c27d));
+ head.position.y=2.25;player.add(head);
+
+ let leftLeg=new THREE.Mesh(new THREE.BoxGeometry(.3,.8,.3),material(0x172554));
+ leftLeg.position.set(-.22,.4,0);player.add(leftLeg);
+ let rightLeg=leftLeg.clone();
+ rightLeg.position.x=.22;player.add(rightLeg);
+
+ player.position.set(0,0,0);
+ scene.add(player);
+}
+
+function createPlayerCar(){
+ car=createVehicle(0x0876d1);
+ car.position.set(6,0,0);
+ scene.add(car);
+}
+
+function createVehicle(color){
+ let group=new THREE.Group();
+ let body=new THREE.Mesh(new THREE.BoxGeometry(2.3,.8,4),material(color,.35));
+ body.position.y=.8;body.castShadow=true;group.add(body);
+ carBody=body;
+
+ let cabin=new THREE.Mesh(new THREE.BoxGeometry(1.7,.8,1.8),material(0x9bdcff,.25));
+ cabin.position.set(0,1.4,-.35);group.add(cabin);
+
+ for(let x of [-1.15,1.15]){
+ for(let z of [-1.3,1.3]){
+ let wheel=new THREE.Mesh(new THREE.CylinderGeometry(.4,.4,.3,12),material(0x151515));
+ wheel.rotation.z=Math.PI/2;
+ wheel.position.set(x,.4,z);group.add(wheel);
+ }
+ }
+ return group;
+}
+
+function createNPC(){
+ let npc=new THREE.Group();
+ let body=new THREE.Mesh(new THREE.BoxGeometry(.6,1,.4),material(0x7c3aed));
+ body.position.y=1;npc.add(body);
+ let head=new THREE.Mesh(new THREE.SphereGeometry(.3,10,10),material(0xf1c27d));
+ head.position.y=1.7;npc.add(head);
+ return npc;
+}
+
+function createTaxi(){
+ taxi=createVehicle(0xffcc22);
+ taxi.position.set(player.position.x+35,0,player.position.z+10);
+ scene.add(taxi);
+ taxiDriver=createNPC();
+ taxiDriver.position.copy(taxi.position);
+ scene.add(taxiDriver);
+ taxiState="approach";
+}
+
+function createDeliveryBike(){
+ deliveryBike=new THREE.Group();
+ let bikeBody=new THREE.Mesh(new THREE.BoxGeometry(.7,.5,1.8),material(0xff7b18));
+ bikeBody.position.y=.7;deliveryBike.add(bikeBody);
+ for(let z of [-.7,.7]){
+ let wheel=new THREE.Mesh(new THREE.TorusGeometry(.3,.08,8,16),material(0x111111));
+ wheel.rotation.y=Math.PI/2;
+ wheel.position.set(0,.3,z);
+ deliveryBike.add(wheel);
+ }
+ deliveryBike.position.set(player.position.x+30,0,player.position.z+20);
+ scene.add(deliveryBike);
+
+ deliveryRider=createNPC();
+ deliveryRider.position.copy(deliveryBike.position);
+ scene.add(deliveryRider);
+ deliveryState="approach";
+}
+
+function animate(){
+ requestAnimationFrame(animate);
+ if(!started)return;
+
+ const delta=.016;
+
+ if(driving){
+ if(moveDir==="forward")carVelocity=Math.min(carVelocity+20*delta,carSpeed());
+ else if(moveDir==="back")carVelocity=Math.max(carVelocity-30*delta,-carSpeed()*.4);
+ else carVelocity*=.96;
+
+ if(moveDir==="left")car.rotation.y+=.9*delta;
+ if(moveDir==="right")car.rotation.y-=.9*delta;
+
+ let forward=new THREE.Vector3(0,0,-1).applyQuaternion(car.quaternion);
+ car.position.addScaledVector(forward,carVelocity*delta);
+
+ player.position.copy(car.position);
+ fuel=Math.max(0,fuel-Math.abs(carVelocity)*delta*.01);
+ }else{
+ let dir=new THREE.Vector3();
+ if(moveDir==="forward")dir.z=-1;
+ if(moveDir==="back")dir.z=1;
+ if(moveDir==="left")dir.x=-1;
+ if(moveDir==="right")dir.x=1;
+
+ if(dir.length()>0){
+ dir.normalize();
+ player.position.addScaledVector(dir,5*delta);
+ player.rotation.y=Math.atan2(dir.x,dir.z);
+ }
+
+ // Gravity and jump physics
+ verticalVelocity-=18*delta;
+ player.position.y+=verticalVelocity*delta;
+ if(player.position.y<=0){
+ player.position.y=0;
+ verticalVelocity=0;
+ onGround=true;
+ }
+ }
+
+ // taxi approach animation
+ if(taxiState==="approach"&&taxi){
+ taxi.position.x+=(player.position.x+4-taxi.position.x)*.018;
+ taxi.position.z+=(player.position.z+5-taxi.position.z)*.018;
+ taxiDriver.position.copy(taxi.position);
+ if(taxi.position.distanceTo(player.position)<8){
+ taxiState="driverDoor";
+ toast("🚕 Taxi arrived! Driver is opening the door.");
+ }
+ }
+
+ // Driver gets out, walks around, opens passenger door
+ if(taxiState==="driverDoor"){
+ taxiDriver.position.x+=.025;
+ taxiDriver.position.z-=.02;
+ if(taxiDriver.position.distanceTo(player.position)<4){
+ taxiState="passengerDoor";
+ toast("Driver: Namaste! Please get inside.");
+ }
+ }
+
+ if(taxiState==="passengerDoor"){
+ taxiState="boarding";
+ setTimeout(()=>{
+ if(taxiState==="boarding"){
+ player.position.copy(taxi.position);
+ player.position.y=1;
+ taxiState="inside";
+ cameraInsideTaxi();
+ toast("You are inside the taxi. Journey started!");
+ document.getElementById("tripStatus").textContent="Driving through city...";
+ }
+ },1500);
+ }
+
+ if(taxiState==="inside"&&taxi){
+ tripTime+=delta;
+ // Drive along the road toward destination
+ let target=taxiTarget.clone().sub(taxi.position);
+ if(target.length()>3){
+ target.normalize();
+ taxi.position.addScaledVector(target,6*delta);
+ taxi.lookAt(taxiTarget.x,taxi.position.y,taxiTarget.z);
+ }
+ player.position.copy(taxi.position);
+ player.position.y=1;
+
+ if(Math.random()<.003)toast("🚦 Taxi stopped for traffic...");
+ if(taxi.position.distanceTo(taxiTarget)<5){
+ taxiState="drop";
+ document.getElementById("tripStatus").textContent="Destination reached";
+ toast("Taxi reached your destination!");
+ setTimeout(finishTaxi,2500);
+ }
+ }
+
+ // Delivery bike arrival
+ if(deliveryState==="approach"&&deliveryBike){
+ deliveryBike.position.x+=(player.position.x+3-deliveryBike.position.x)*.02;
+ deliveryBike.position.z+=(player.position.z+3-deliveryBike.position.z)*.02;
+ deliveryRider.position.copy(deliveryBike.position);
+ if(deliveryBike.position.distanceTo(player.position)<5){
+ deliveryState="delivered";
+ toast("🛵 Delivery rider arrived at your home!");
+ setTimeout(()=>{
+ homeFood.push("Food Package");
+ toast("Food delivered! Collect it from home storage.");
+ scene.remove(deliveryBike);
+ scene.remove(deliveryRider);
+ deliveryBike=null;deliveryRider=null;deliveryState="idle";
+ },2500);
+ }
+ }
+
+ const target=driving?car.position:player.position;
+ if(taxiState==="inside"||taxiState==="drop"){
+ // Interior viewpoint: windshield city view
+ camera.position.lerp(new THREE.Vector3(taxi.position.x,taxi.position.y+2,taxi.position.z+1),.12);
+ camera.lookAt(taxi.position.x+4,taxi.position.y+1,taxi.position.z-10);
+ }else{
+ camera.position.lerp(new THREE.Vector3(target.x,target.y+5,target.z+9),.09);
+ camera.lookAt(target.x,target.y+1,target.z);
+ }
+
+ updateHUD();
+ renderer.render(scene,camera);
+}
+
+function carSpeed(){
+ let c=cars.find(x=>x.name===currentCar)||cars[0];
+ return c.speed;
+}
+
+function move(d){moveDir=d}
+function stopMove(){moveDir=""}
+
+function jump(){
+ if(driving||!onGround)return;
+ verticalVelocity=8;
+ onGround=false;
+}
+
+function toggleCar(){
+ if(driving){
+ driving=false;
+ carVelocity=0;
+ player.position.x=car.position.x+3;
+ player.position.z=car.position.z;
+ toast("Exited vehicle.");
+ }else{
+ if(player.position.distanceTo(car.position)<8){
+ driving=true;
+ toast("Entered your car!");
+ }else toast("Come closer to your car.");
+ }
+}
+
+function updateHUD(){
+ document.getElementById("wallet").textContent=Math.floor(wallet);
+ document.getElementById("bank").textContent=Math.floor(bank);
+ document.getElementById("carName").textContent=currentCar;
+ document.getElementById("fuel").textContent=Math.floor(fuel);
+ document.getElementById("storage").textContent=usedStorage+"/"+phoneStorage;
+}
+
+function toast(s){
+ let e=document.getElementById("message");
+ e.textContent=s;e.style.display="block";
+ clearTimeout(e.timer);
+ e.timer=setTimeout(()=>e.style.display="none",3000);
+}
+
+function openPhone(){show("phone")}
+function closePanel(){document.getElementById("panel").style.display="none"}
+function show(name){
+ document.getElementById("panel").style.display="block";
+ let c=document.getElementById("content");
+ c.innerHTML="";
+
+ if(name==="phone"){
+ c.innerHTML=`<h2>📱 My Smartphone</h2>
+ <div class="card">Storage ${usedStorage} / ${phoneStorage} MB</div>
+ <div class="appgrid">`;
+ installed.forEach(n=>{
+ let a=appData.find(x=>x[0]===n);
+ c.innerHTML+=`<div class="app" onclick="openApp('${n}')">
+ <span class="appicon">${a?a[1]:"📲"}</span><span class="appname">${n}</span></div>`;
+ });
+ c.innerHTML+="</div><button onclick=\"show('store')\">📥 App Store</button>";
+ }
+
+ if(name==="store"){
+ c.innerHTML="<h2>📥 App Store</h2>";
+ appData.forEach(a=>{
+ let is=installed.includes(a[0]);
+ c.innerHTML+=`<div class="card">
+ <span style="font-size:26px">${a[1]}</span> <b>${a[0]}</b>
+ <p>${a[2]} MB</p>
+ ${is?(a[3]?"<button disabled>Pre-installed</button>":
+ `<button onclick="uninstall('${a[0]}')">Uninstall</button>`):
+ `<button onclick="install('${a[0]}')">Install</button>`}
+ </div>`;
+ });
+ }
+
+ if(name==="wallet"){
+ c.innerHTML=`<h2>💰 Wallet</h2><div class="card">Balance: ₹${wallet}</div>
+ <button onclick="show('bank')">🏦 Banking</button>`;
+ }
+
+ if(name==="bank"){
+ c.innerHTML=`<h2>🏦 Virtual Bank</h2>
+ <div class="card">Account ID: ${bankID}<br>Bank Balance: ₹${bank}<br>
+ Virtual Card: ${bankCard?"Active":"Not issued"}</div>
+ <button onclick="deposit()">Deposit</button>
+ <button onclick="withdraw()">Withdraw</button>
+ <button onclick="issueCard()">Get Card</button>
+ <button onclick="payCard()">Card Payment</button>`;
+ }
+
+ if(name==="jobs"){
+ c.innerHTML="<h2>💼 Jobs & Income</h2><p>Complete work and earn virtual salary.</p>";
+ [["Delivery Job",600],["Taxi Driver",900],["Restaurant Worker",700],
+ ["Office Job",1200],["Shop Assistant",800]].forEach(j=>{
+ c.innerHTML+=`<div class="card"><b>${j[0]}</b><br>Salary: ₹${j[1]}
+ <button onclick="doJob('${j[0]}',${j[1]})">Start Work</button></div>`;
+ });
+ c.innerHTML+=`<div class="card"><h3>🚘 Car Rental Job</h3>
+ <p>List your unused cars. Daily rent is limited by car class.</p>
+ <button onclick="show('rental')">Manage Rental Cars</button>
+ <button onclick="show('taxibiz')">Taxi Business</button></div>`;
+ }
+
+ if(name==="rental"){
+ c.innerHTML="<h2>🚘 Car Rental Manager</h2>";
+ ownedCars.forEach(n=>{
+ let carInfo=cars.find(x=>x.name===n);
+ let listing=rentalListings[n];
+ c.innerHTML+=`<div class="card">
+ <b>${n}</b><br>
+ Daily Rent Limit: ₹${carInfo.rentMin} - ₹${carInfo.rentMax}<br>
+ ${listing?`Listed Rent: ₹${listing.rate}<br>Tenant: ${listing.tenant}<br>Days: ${listing.days}`:"Not listed"}
+ <br><button onclick="listRental('${n}')">${listing?"Update Listing":"List Car for Rent"}</button>
+ ${listing?`<button onclick="collectRental('${n}')">Collect Daily Rent</button>
+ <button onclick="removeRental('${n}')">Remove Listing</button>`:""}
+ </div>`;
+ });
+ }
+
+ if(name==="taxibiz"){
+ c.innerHTML=`<h2>🚕 Taxi Business</h2>
+ <div class="card">Cars Owned: ${ownedCars.length}<br>Business Income: ₹${rentalIncome}</div>
+ <button onclick="show('shopping')">Buy Cars</button>
+ <button onclick="collectTaxiBiz()">Collect Taxi Income</button>`;
+ }
+
+ if(name==="shopping"){
+ c.innerHTML="<h2>🛒 Shopping Mall</h2><h3>🚗 Car Showroom</h3>";
+ cars.forEach(x=>{
+ let own=ownedCars.includes(x.name);
+ c.innerHTML+=`<div class="card"><b>${x.name}</b><br>
+ Price ₹${x.price}<br>Speed ${x.speed} km/h<br>
+ Daily Rent Limit ₹${x.rentMin}-₹${x.rentMax}<br>
+ ${own?`<button onclick="selectCar('${x.name}')">Select</button>`:
+ `<button onclick="buyCar('${x.name}')">Buy Car</button>`}
+ </div>`;
+ });
+ c.innerHTML+="<h3>📱 Phone Upgrades</h3>";
+ phones.forEach(p=>{
+ c.innerHTML+=`<div class="card"><b>${p.name}</b><br>
+ Storage: ${p.storage} MB<br>Price ₹${p.price}
+ <button onclick="buyPhone('${p.name}')">Upgrade Phone</button></div>`;
+ });
+ c.innerHTML+=`<h3>💾 Extra Storage</h3>
+ <div class="card">Add 500 MB — ₹2000
+ <button onclick="buyStorage()">Buy Storage</button></div>`;
+ }
+
+ if(name==="food"){
+ c.innerHTML="<h2>🍔 Food Delivery</h2>";
+ [["Burger",150],["Pizza",300],["Indian Thali",250]].forEach(f=>{
+ c.innerHTML+=`<div class="card"><span style="font-size:30px">🍽️</span>
+ <b>${f[0]}</b><br>₹${f[1]}<button onclick="orderFood('${f[0]}',${f[1]})">Order Food</button></div>`;
+ });
+ c.innerHTML+="<h3>🏠 Home Delivery Storage</h3>";
+ homeFood.forEach((f,i)=>{
+ c.innerHTML+=`<div class="card">${f}<button onclick="collectFood(${i})">Collect</button></div>`;
+ });
+ }
+
+ if(name==="taxi"){
+ c.innerHTML="<h2>🚕 Book Taxi</h2><p>Select your destination on city GPS.</p>";
+ places.forEach(p=>{
+ c.innerHTML+=`<div class="card">📍 ${p.name}<br>
+ <button onclick="bookTaxi('${p.name}')">Go Here — ₹${taxiFare}</button></div>`;
+ });
+ }
+
+ if(name==="maps"){
+ c.innerHTML="<h2>🗺️ City Map & GPS</h2>";
+ places.forEach(p=>{
+ c.innerHTML+=`<div class="card">📍 <b>${p.name}</b><br>
+ Coordinates: ${p.x}, ${p.z}<br>
+ <button onclick="navigate('${p.name}')">Navigate</button>
+ <button onclick="bookTaxi('${p.name}')">Book Taxi</button></div>`;
+ });
+ }
+
+ if(name==="garage"){
+ c.innerHTML=`<h2>🔧 Garage</h2><div class="card">Fuel ${fuel}%</div>
+ <button onclick="refuel()">Refuel ₹300</button>
+ <button onclick="repair()">Repair ₹500</button>
+ <button onclick="paint()">Change Color</button>`;
+ }
+
+ if(name==="settings"){
+ c.innerHTML=`<h2>⚙️ Settings</h2>
+ <label>Graphics</label><select onchange="graphics=this.value">
+ <option>Low</option><option selected>Medium</option><option>High</option></select>
+ <label>Camera Sensitivity</label><input type="range" min="1" max="10">
+ <button onclick="show('phone')">Phone Storage</button>`;
+ }
+
+ if(name==="music"){
+ c.innerHTML=`<h2>🎵 Music Player</h2>
+ <input id="musicURL" placeholder="Direct audio URL">
+ <audio id="audio" controls style="width:100%"></audio>
+ <button onclick="playMusic()">Play</button>`;
+ }
+
+ if(name==="social"){
+ c.innerHTML=`<h2>👥 Social</h2><div class="card">NPC City Residents</div>
+ <button onclick="toast('NPC: Namaste! Welcome to our city.')">Talk to NPC</button>`;
+ }
+}
+
+function openApp(n){
+ let m={"Wallet":"wallet","Maps & GPS":"maps","Settings":"settings",
+ "Play Store":"store","Food Delivery":"food","Music":"music",
+ "Jobs":"jobs","Taxi":"taxi","Garage":"garage","Shopping":"shopping",
+ "Social":"social","Banking":"bank"};
+ show(m[n]||"phone");
+}
+
+function install(n){
+ let a=appData.find(x=>x[0]===n);
+ if(!a)return;
+ if(usedStorage+a[2]>phoneStorage){toast("Not enough storage. Upgrade or uninstall apps.");return}
+ if(wallet<100){toast("Installation fee ₹100 required.");return}
+ wallet-=100;usedStorage+=a[2];installed.push(n);
+ updateHUD();show("store");toast(n+" installed.");
+}
+
+function uninstall(n){
+ let a=appData.find(x=>x[0]===n);
+ if(!a||a[3])return;
+ installed=installed.filter(x=>x!==n);
+ usedStorage-=a[2];updateHUD();show("store");
+ toast(n+" removed. Storage freed.");
+}
+
+function deposit(){
+ let a=Number(prompt("Amount to deposit:"));
+ if(a>0&&a<=wallet){wallet-=a;bank+=a;updateHUD();show("bank")}
+}
+function withdraw(){
+ let a=Number(prompt("Amount to withdraw:"));
+ if(a>0&&a<=bank){bank-=a;wallet+=a;updateHUD();show("bank")}
+}
+function issueCard(){bankCard=true;show("bank");toast("Virtual card issued!")}
+function payCard(){
+ if(!bankCard){toast("Issue your virtual card first.");return}
+ let a=Number(prompt("Card payment amount:"));
+ if(a>0&&a<=bank){bank-=a;updateHUD();show("bank");toast("Virtual payment completed.")}
+}
+
+function doJob(job,salary){
+ toast("Working: "+job);
+ setTimeout(()=>{wallet+=salary;updateHUD();toast("Job complete! Salary ₹"+salary)},6000);
+}
+
+function buyCar(n){
+ let x=cars.find(c=>c.name===n);
+ if(wallet<x.price){toast("Not enough money.");return}
+ wallet-=x.price;ownedCars.push(n);updateHUD();show("shopping");
+ toast(n+" purchased!");
+}
+
+function selectCar(n){
+ currentCar=n;
+ let x=cars.find(c=>c.name===n);
+ if(x){
+ carSpeed= x.speed;
+ }
+ toast("Selected "+n);
+ updateHUD();
+ show("shopping");
+}
+
+let carSpeed=12;
+
+function buyPhone(n){
+ let p=phones.find(x=>x.name===n);
+ if(wallet<p.price){toast("Not enough money.");return}
+ wallet-=p.price;phoneStorage=p.storage;
+ updateHUD();show("shopping");toast("Phone upgraded!");
+}
+
+function buyStorage(){
+ if(wallet<2000){toast("Not enough money.");return}
+ wallet-=2000;phoneStorage+=500;
+ updateHUD();show("shopping");toast("Extra 500 MB added.");
+}
+
+function listRental(n){
+ let c=cars.find(x=>x.name===n);
+ let amount=Number(prompt("Set daily rent (₹"+c.rentMin+" to ₹"+c.rentMax+")",c.rentMin));
+ if(amount<c.rentMin||amount>c.rentMax){toast("Rent amount is outside the allowed limit.");return}
+ rentalListings[n]={rate:amount,tenant:"NPC Tenant "+Math.floor(Math.random()*90+10),days:1};
+ show("rental");toast(n+" listed for rent.");
+}
+
+function collectRental(n){
+ let l=rentalListings[n];
+ if(!l)return;
+ wallet+=l.rate;
+ rentalIncome+=l.rate;
+ l.days++;
+ updateHUD();show("rental");
+ toast("Daily rental received: ₹"+l.rate);
+}
+
+function removeRental(n){
+ delete rentalListings[n];show("rental");toast("Rental listing removed.");
+}
+
+function collectTaxiBiz(){
+ let amount=ownedCars.length*700;
+ wallet+=amount;rentalIncome+=amount;
+ updateHUD();show("taxibiz");toast("Taxi business earnings ₹"+amount);
+}
+
+function orderFood(food,price){
+ if(wallet<price){toast("Not enough money.");return}
+ wallet-=price;updateHUD();toast("Order accepted! Delivery rider is on the way.");
+ createDeliveryBike();
+ setTimeout(()=>toast("Rider is driving to your house..."),1500);
+}
+
+function createDeliveryBike(){if(!deliveryBike)createDeliveryBikeReal()}
+function createDeliveryBikeReal(){createDeliveryBikeInternal()}
+function createDeliveryBikeInternal(){
+ // Create animated food delivery motorcycle and rider
+ deliveryBike=new THREE.Group();
+ let base=new THREE.Mesh(new THREE.BoxGeometry(.8,.6,1.7),material(0xff7b18));
+ base.position.y=.7;deliveryBike.add(base);
+ let wheelMat=material(0x111111);
+ for(let z of [-.7,.7]){
+ let w=new THREE.Mesh(new THREE.TorusGeometry(.3,.08,8,16),wheelMat);
+ w.rotation.y=Math.PI/2;w.position.set(0,.3,z);deliveryBike.add(w);
+ }
+ deliveryBike.position.set(player.position.x+25,0,player.position.z+15);
+ scene.add(deliveryBike);
+ deliveryRider=createNPC();
+ deliveryRider.position.copy(deliveryBike.position);
+ scene.add(deliveryRider);
+ deliveryState="approach";
+}
+
+function collectFood(i){
+ inventory.push(homeFood[i]);
+ homeFood.splice(i,1);show("food");toast("Food added to inventory.");
+}
+
+function bookTaxi(placeName){
+ if(wallet<taxiFare){toast("Not enough money for taxi.");return}
+ if(taxiState!=="idle"){toast("A taxi ride is already active.");return}
+ let p=places.find(x=>x.name===placeName);
+ if(!p){toast("Choose a destination.");return}
+ wallet-=taxiFare;updateHUD();
+ taxiDestination=placeName;
+ taxiTarget.set(p.x,0,p.z);
+ document.getElementById("tripHUD").style.display="block";
+ document.getElementById("tripDest").textContent=placeName;
+ document.getElementById("tripStatus").textContent="Driver approaching...";
+ createTaxi();
+ show("taxi");
+}
+
+function cameraInsideTaxi(){
+ camera.position.set(taxi.position.x,taxi.position.y+2,taxi.position.z+1);
+ camera.lookAt(taxi.position.x,taxi.position.y+1,taxi.position.z-10);
+}
+
+function finishTaxi(){
+ if(taxi){scene.remove(taxi);taxi=null}
+ if(taxiDriver){scene.remove(taxiDriver);taxiDriver=null}
+ taxiState="idle";
+ driving=false;
+ player.position.copy(taxiTarget);
+ player.position.y=0;
+ document.getElementById("tripHUD").style.display="none";
+ camera.position.set(player.position.x,player.position.y+5,player.position.z+9);
+ toast("You have arrived. Taxi fare paid ₹"+taxiFare);
+}
+
+function navigate(name){
+ let p=places.find(x=>x.name===name);
+ if(!p)return;
+ toast("GPS navigation: "+name);
+}
+
+function refuel(){
+ if(wallet<300){toast("Not enough money.");return}
+ wallet-=300;fuel=100;updateHUD();show("garage");
+}
+function repair(){
+ if(wallet<500){toast("Not enough money.");return}
+ wallet-=500;updateHUD();show("garage");toast("Car repaired.");
+}
+function paint(){
+ if(carBody)carBody.material.color.set(Math.random()*0xffffff);
+ toast("Car paint changed!");
+}
+
+function playMusic(){
+ let u=document.getElementById("musicURL").value;
+ document.getElementById("audio").src=u;
+ document.getElementById("audio").play().catch(()=>toast("Use a direct audio file URL."));
+}
+</script>
+</body>
+</html>
