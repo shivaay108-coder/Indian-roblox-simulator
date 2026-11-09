@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Indian Roblox Life Simulator - Prototype 5</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;overflow:hidden;background:#101827;color:white;font-family:Arial}
+button,select,input{font-size:14px;border:0;border-radius:9px;padding:10px;margin:3px}
+button{background:#087fce;color:white;font-weight:bold}
+button:active{background:#00bfff}
+#game{position:fixed;inset:0}
+#hud{position:fixed;top:8px;left:8px;z-index:5;background:#071421d9;padding:10px;border-radius:12px;font-size:13px}
+#rightHud{position:fixed;top:8px;right:8px;z-index:5}
+#panel{display:none;position:fixed;z-index:10;left:50%;top:50%;transform:translate(-50%,-50%);width:min(94%,430px);max-height:82vh;overflow:auto;background:#101d2bf5;border:1px solid #168ed0;border-radius:16px;padding:15px;box-shadow:0 0 25px #008cff55}
+#panel h2{margin-top:0;color:#4bc8ff}
+#panel button{width:100%;margin:4px 0}
+#close{background:#a83232}
+#toast{position:fixed;z-index:20;bottom:90px;left:50%;transform:translateX(-50%);background:#071421eF;padding:12px 18px;border-radius:12px;display:none}
+#mobile{position:fixed;bottom:12px;left:10px;right:10px;z-index:6;display:flex;justify-content:space-between;pointer-events:none}
+.controls{pointer-events:auto;display:flex;gap:5px;align-items:end}
+.controls button{width:58px;height:55px;background:#102e4bdc;border:1px solid #48baff}
+#joystick{width:115px;height:115px;border-radius:50%;background:#ffffff22;border:2px solid #ffffff77;position:relative;touch-action:none}
+#stick{width:42px;height:42px;border-radius:50%;background:#36baff;position:absolute;left:35px;top:35px}
+#phoneBtn{position:fixed;right:12px;bottom:105px;z-index:7;width:60px;height:60px;border-radius:50%;font-size:25px}
+#start{position:fixed;inset:0;background:linear-gradient(135deg,#06101f,#12385c);z-index:30;display:flex;align-items:center;justify-content:center;text-align:center}
+#start button{font-size:18px;padding:15px 30px}
+.small{font-size:12px;color:#b7d7ed}
+.row{display:flex;justify-content:space-between;align-items:center;gap:5px}
+#mapBox{height:130px;background:#152e3b;border-radius:10px;padding:8px;position:relative}
+#mapCanvas{width:100%;height:100%}
+@media(min-width:800px){#mobile{left:20px;right:20px}#joystick{width:130px;height:130px}}
+</style>
+</head>
+<body>
+<div id="game"></div>
+
+<div id="start">
+ <div>
+  <h1>INDIAN LIFE SIMULATOR</h1>
+  <h3>Prototype 5</h3>
+  <p>Explore • Work • Drive • Build Your Life</p>
+  <button onclick="startGame()">START GAME</button>
+  <p class="small">3D City Life Simulation</p>
+ </div>
+</div>
+
+<div id="hud">
+ <div><b>₹ <span id="money">55000</span></b></div>
+ <div>❤️ Health: <span id="health">100</span>%</div>
+ <div>🍔 Hunger: <span id="hunger">100</span>%</div>
+ <div>📍 <span id="location">City Center</span></div>
+ <div>🚗 <span id="vehicleStatus">On Foot</span></div>
+</div>
+
+<div id="rightHud">
+ <button onclick="openPanel('phone')">📱 Phone</button>
+ <button onclick="openPanel('map')">🗺 Map</button>
+</div>
+
+<button id="phoneBtn" onclick="openPanel('phone')">📱</button>
+
+<div id="mobile">
+ <div class="controls">
+  <div id="joystick"><div id="stick"></div></div>
+ </div>
+ <div class="controls">
+  <button onclick="jump()">⬆</button>
+  <button onclick="runToggle()">🏃</button>
+  <button onclick="interact()">E</button>
+ </div>
+</div>
+
+<div id="panel">
+ <div class="row"><h2 id="panelTitle">Phone</h2><button id="close" onclick="closePanel()">✕</button></div>
+ <div id="panelContent"></div>
+</div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+
+/* =========================
+   GAME DATA
+========================= */
+const game={
+ money:55000,
+ health:100,
+ hunger:100,
+ storage:500,
+ usedStorage:260,
+ running:false,
+ inCar:false,
+ car:null,
+ carName:"",
+ job:null,
+ jobBusy:false,
+ homeFood:[],
+ inventory:[],
+ ownedCars:[],
+ rentalCars:[],
+ businessIncome:0,
+ lastBusinessDay:-1,
+ armor:null,
+ armorTime:0,
+ armorParts:[],
+ flying:false,
+ started:false,
+ day:1,
+ account:""
+};
+
+const apps=[
+ {name:"Wallet",size:35,base:true},
+ {name:"Maps & GPS",size:120,base:true},
+ {name:"Settings",size:25,base:true},
+ {name:"Play Store",size:80,base:true},
+ {name:"Food Delivery",size:140},
+ {name:"Music",size:90},
+ {name:"Jobs",size:110},
+ {name:"Taxi",size:160},
+ {name:"Garage",size:130},
+ {name:"Shopping",size:120},
+ {name:"Social",size:150},
+ {name:"Banking",size:100},
+ {name:"Armor Rental",size:100}
+];
+let installedApps=["Wallet","Maps & GPS","Settings","Play Store"];
+const carTypes=[
+ {name:"Basic Hatchback",price:8000,speed:0.12,color:0xdddddd},
+ {name:"Sedan",price:20000,speed:0.16,color:0x2255cc},
+ {name:"SUV",price:35000,speed:0.19,color:0x222222},
+ {name:"Sports Car",price:50000,speed:0.25,color:0xcc2222},
+ {name:"Supercar",price:150000,speed:0.32,color:0xffaa00},
+ {name:"Hypercar",price:300000,speed:0.40,color:0x11aaaa}
+];
+const jobTypes=[
+ {name:"Food Delivery",pay:500},
+ {name:"Construction Worker",pay:800},
+ {name:"Shop Worker",pay:450},
+ {name:"Mechanic",pay:700},
+ {name:"Office Worker",pay:900},
+ {name:"Security Guard",pay:650},
+ {name:"Taxi Driver",pay:750},
+ {name:"Bus Driver",pay:1000}
+];
+
+/* =========================
+   THREE JS WORLD
+========================= */
+let scene,camera,renderer,clock,player;
+let buildings=[],cars=[],roads=[];
+let keys={};
+let moveX=0,moveZ=0;
+let cameraAngle=0;
+let playerY=0;
+let jumpVelocity=0;
+let vehicleSpeed=0;
+let targetPosition=new THREE.Vector3(0,0,0);
+
+function createWorld(){
+ scene=new THREE.Scene();
+ scene.background=new THREE.Color(0x83b9db);
+ scene.fog=new THREE.Fog(0x83b9db,65,220);
+
+ camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,500);
+ camera.position.set(0,6,10);
+
+ renderer=new THREE.WebGLRenderer({antialias:true});
+ renderer.setSize(innerWidth,innerHeight);
+ renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));
+ renderer.shadowMap.enabled=true;
+ renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+ document.getElementById("game").appendChild(renderer.domElement);
+
+ clock=new THREE.Clock();
+
+ const ambient=new THREE.HemisphereLight(0xffffff,0x435566,1.5);
+ scene.add(ambient);
+ const sun=new THREE.DirectionalLight(0xffffff,1.3);
+ sun.position.set(30,60,20);
+ sun.castShadow=true;
+ scene.add(sun);
+
+ const ground=new THREE.Mesh(
+  new THREE.PlaneGeometry(250,250),
+  new THREE.MeshStandardMaterial({color:0x4c8650})
+ );
+ ground.rotation.x=-Math.PI/2;
+ ground.receiveShadow=true;
+ scene.add(ground);
+
+ createRoad(0,0,250,12);
+ createRoad(0,0,12,250);
+ createRoad(0,35,250,8);
+ createRoad(35,0,8,250);
+ createBuildings();
+ createTrees();
+ createPlayer();
+ createTraffic();
+
+ window.addEventListener("resize",resize);
+ animate();
+}
+
+function createRoad(x,z,w,h){
+ const road=new THREE.Mesh(
+  new THREE.BoxGeometry(w,.12,h),
+  new THREE.MeshStandardMaterial({color:0x30353b})
+ );
+ road.position.set(x,.06,z);
+ road.receiveShadow=true;
+ scene.add(road);
+ roads.push(road);
+
+ if(w>h){
+  for(let i=-w/2+5;i<w/2;i+=12){
+   const line=new THREE.Mesh(
+    new THREE.BoxGeometry(4,.03,.15),
+    new THREE.MeshBasicMaterial({color:0xffffff})
+   );
+   line.position.set(x+i,.14,z);
+   scene.add(line);
+  }
+ }
+}
+
+function createBuildings(){
+ const colors=[0xc9b9a2,0xa7c8d9,0xd3d3d3,0xe2b7a0,0x9da9ba,0xb4c9ad];
+ for(let x=-90;x<=90;x+=20){
+  for(let z=-90;z<=90;z+=20){
+   if(Math.abs(x)<15||Math.abs(z)<15||Math.abs(x-35)<10||Math.abs(z-35)<10)continue;
+   const height=8+Math.random()*22;
+   const building=new THREE.Mesh(
+    new THREE.BoxGeometry(10,height,10),
+    new THREE.MeshStandardMaterial({color:colors[Math.floor(Math.random()*colors.length)]})
+   );
+   building.position.set(x,height/2,z);
+   building.castShadow=true;
+   building.receiveShadow=true;
+   scene.add(building);
+   buildings.push(building);
+
+   for(let y=2;y<height-1;y+=3){
+    for(let wx=-3;wx<=3;wx+=3){
+     const win=new THREE.Mesh(
+      new THREE.BoxGeometry(1.1,1.3,.08),
+      new THREE.MeshStandardMaterial({color:0x6eb9d9,emissive:0x153344})
+     );
+     win.position.set(x+wx,y,z+5.06);
+     scene.add(win);
+    }
+   }
+  }
+ }
+}
+
+function createTrees(){
+ for(let i=0;i<65;i++){
+  const x=(Math.random()-.5)*190;
+  const z=(Math.random()-.5)*190;
+  if(Math.abs(x)<12||Math.abs(z)<12)continue;
+  const trunk=new THREE.Mesh(
+   new THREE.CylinderGeometry(.25,.35,2,7),
+   new THREE.MeshStandardMaterial({color:0x69452b})
+  );
+  trunk.position.set(x,1,z);
+  scene.add(trunk);
+  const leaves=new THREE.Mesh(
+   new THREE.SphereGeometry(1.5,8,8),
+   new THREE.MeshStandardMaterial({color:0x247b42})
+  );
+  leaves.position.set(x,2.7,z);
+  scene.add(leaves);
+ }
+}
+
+function createPlayer(){
+ player=new THREE.Group();
+ const skin=new THREE.MeshStandardMaterial({color:0xe6b58e});
+ const shirt=new THREE.MeshStandardMaterial({color:0x1564ad});
+ const pants=new THREE.MeshStandardMaterial({color:0x252e45});
+ const hair=new THREE.MeshStandardMaterial({color:0x241b18});
+
+ const body=new THREE.Mesh(new THREE.BoxGeometry(1,1.2,.55),shirt);
+ body.position.y=1.6;
+ player.add(body);
+ const head=new THREE.Mesh(new THREE.BoxGeometry(.72,.72,.7),skin);
+ head.position.y=2.55;
+ player.add(head);
+ const hairMesh=new THREE.Mesh(new THREE.BoxGeometry(.76,.22,.74),hair);
+ hairMesh.position.set(0,2.92,0);
+ player.add(hairMesh);
+
+ const eyeMat=new THREE.MeshBasicMaterial({color:0x111111});
+ [-.17,.17].forEach(x=>{
+  const eye=new THREE.Mesh(new THREE.BoxGeometry(.08,.07,.04),eyeMat);
+  eye.position.set(x,2.61,.36);
+  player.add(eye);
+ });
+ const mouth=new THREE.Mesh(new THREE.BoxGeometry(.18,.035,.03),eyeMat);
+ mouth.position.set(0,2.38,.37);
+ player.add(mouth);
+
+ const armGeo=new THREE.BoxGeometry(.25,.9,.28);
+ const legGeo=new THREE.BoxGeometry(.32,.85,.35);
+ player.userData.limbs=[];
+ for(let side of [-1,1]){
+  const arm=new THREE.Mesh(armGeo,skin);
+  arm.position.set(side*.67,1.65,0);
+  player.add(arm);
+  player.userData.limbs.push(arm);
+  const leg=new THREE.Mesh(legGeo,pants);
+  leg.position.set(side*.23,.55,0);
+  player.add(leg);
+  player.userData.limbs.push(leg);
+ }
+ player.position.set(0,0,0);
+ scene.add(player);
+}
+
+function createTraffic(){
+ for(let i=0;i<8;i++){
+  const car=createCarMesh(0x3377aa);
+  car.position.set(-80+i*20,.2,8);
+  car.userData.traffic=true;
+  car.userData.direction=1;
+  scene.add(car);
+  cars.push(car);
+ }
+}
+
+function createCarMesh(color){
+ const group=new THREE.Group();
+ const mat=new THREE.MeshStandardMaterial({color,metalness:.55,roughness:.35});
+ const body=new THREE.Mesh(new THREE.BoxGeometry(2.2,.7,4),mat);
+ body.position.y=.7;
+ group.add(body);
+ const cabin=new THREE.Mesh(
+  new THREE.BoxGeometry(1.7,.8,2),
+  new THREE.MeshStandardMaterial({color:0x24394d,metalness:.3,roughness:.2})
+ );
+ cabin.position.set(0,1.35,-.2);
+ group.add(cabin);
+ for(let x of [-.85,.85]){
+  for(let z of [-1.25,1.25]){
+   const wheel=new THREE.Mesh(
+    new THREE.CylinderGeometry(.38,.38,.2,12),
+    new THREE.MeshStandardMaterial({color:0x151515})
+   );
+   wheel.rotation.z=Math.PI/2;
+   wheel.position.set(x,.38,z);
+   group.add(wheel);
+  }
+ }
+ group.userData.speed=.16;
+ return group;
+}
+
+/* =========================
+   GAME LOOP
+========================= */
+function animate(){
+ requestAnimationFrame(animate);
+ if(!renderer)return;
+ const dt=Math.min(clock.getDelta(),.05);
+
+ if(game.started){
+  updatePlayer(dt);
+  updateTraffic(dt);
+  updateArmor(dt);
+  updateCamera();
+  game.hunger=Math.max(0,game.hunger-dt*.025);
+  if(game.hunger===0)game.health=Math.max(1,game.health-dt*.1);
+  updateHUD();
+ }
+ renderer.render(scene,camera);
+}
+
+function updatePlayer(dt){
+ if(game.flying){
+  const speed=game.running?.35:.20;
+  player.position.x+=(moveX*Math.cos(cameraAngle)+moveZ*Math.sin(cameraAngle))*speed;
+  player.position.z+=(-moveZ*Math.cos(cameraAngle)+moveX*Math.sin(cameraAngle))*speed;
+  player.position.y+=((keys[" "]||keys["ArrowUp"]?1:0)-(keys["Shift"]||keys["ArrowDown"]?1:0))*speed;
+  player.position.y=Math.max(2,Math.min(60,player.position.y));
+  return;
+ }
+
+ if(game.inCar&&game.car){
+  const turn=(keys["a"]||keys["ArrowLeft"]?-1:0)+(keys["d"]||keys["ArrowRight"]?1:0);
+  const accel=(keys["w"]||keys["ArrowUp"]?1:0)-(keys["s"]||keys["ArrowDown"]?1:0);
+  vehicleSpeed+=accel*.008;
+  vehicleSpeed*=.98;
+  vehicleSpeed=Math.max(-.2,Math.min(.5,vehicleSpeed));
+  game.car.rotation.y-=turn*.035;
+  game.car.position.x+=Math.sin(game.car.rotation.y)*vehicleSpeed;
+  game.car.position.z+=Math.cos(game.car.rotation.y)*vehicleSpeed;
+  player.position.copy(game.car.position);
+  player.position.y=.2;
+  player.rotation.y=game.car.rotation.y;
+  return;
+ }
+
+ let x=moveX,z=moveZ;
+ if(keys["w"]||keys["ArrowUp"])z=-1;
+ if(keys["s"]||keys["ArrowDown"])z=1;
+ if(keys["a"]||keys["ArrowLeft"])x=-1;
+ if(keys["d"]||keys["ArrowRight"])x=1;
+ const length=Math.hypot(x,z);
+ if(length>0){
+  x/=length;z/=length;
+  const speed=game.running?.18:.09;
+  player.position.x+=(x*Math.cos(cameraAngle)+z*Math.sin(cameraAngle))*speed;
+  player.position.z+=(-z*Math.cos(cameraAngle)+x*Math.sin(cameraAngle))*speed;
+  player.rotation.y=Math.atan2(x,-z);
+  const t=performance.now()*.012;
+  player.userData.limbs.forEach((limb,i)=>limb.rotation.x=Math.sin(t+i*Math.PI)*.5);
+ }else{
+  player.userData.limbs.forEach(limb=>limb.rotation.x*=.8);
+ }
+
+ player.position.x=Math.max(-115,Math.min(115,player.position.x));
+ player.position.z=Math.max(-115,Math.min(115,player.position.z));
+
+ if(jumpVelocity!==0||playerY>0){
+  jumpVelocity-=.018;
+  playerY+=jumpVelocity;
+  if(playerY<=0){playerY=0;jumpVelocity=0}
+  player.position.y=playerY;
+ }
+}
+
+function updateTraffic(dt){
+ cars.forEach(car=>{
+  if(car.userData.traffic){
+   car.position.x+=car.userData.direction*.04;
+   if(car.position.x>110)car.position.x=-110;
+  }
+ });
+}
+
+function updateCamera(){
+ if(!player)return;
+ const distance=game.inCar?8:9;
+ const height=game.flying?3:5;
+ const target=game.inCar?game.car.position:player.position;
+ const desired=new THREE.Vector3(
+  target.x+Math.sin(cameraAngle)*distance,
+  target.y+height,
+  target.z+Math.cos(cameraAngle)*distance
+ );
+ camera.position.lerp(desired,.08);
+ camera.lookAt(target.x,target.y+1.5,target.z);
+}
+
+function resize(){
+ if(!camera||!renderer)return;
+ camera.aspect=innerWidth/innerHeight;
+ camera.updateProjectionMatrix();
+ renderer.setSize(innerWidth,innerHeight);
+}
+
+/* =========================
+   PLAYER CONTROLS
+========================= */
+window.addEventListener("keydown",e=>{
+ keys[e.key.toLowerCase()]=true;
+ if(e.key.toLowerCase()==="e")interact();
+ if(e.key.toLowerCase()==="f")toggleVehicle();
+ if(e.key===" ")jump();
+});
+window.addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
+
+function jump(){
+ if(!game.flying&&!game.inCar&&playerY===0)jumpVelocity=.25;
+}
+function runToggle(){
+ game.running=!game.running;
+ toast(game.running?"Running ON":"Running OFF");
+}
+function interact(){
+ if(game.flying){toast("Armor flight active");return}
+ if(game.inCar){toggleVehicle();return}
+ let nearest=null,dist=Infinity;
+ cars.forEach(c=>{
+  if(c.userData.traffic)return;
+  const d=player.position.distanceTo(c.position);
+  if(d<dist){dist=d;nearest=c}
+ });
+ if(nearest&&dist<6){
+  game.car=nearest;game.inCar=true;
+  game.carName=nearest.userData.name||"Personal Vehicle";
+  toast("Entered "+game.carName);
+ }else{
+  toast("Nearby interaction: use Phone apps");
+ }
+}
+
+function toggleVehicle(){
+ if(game.flying){toast("Exit armor first");return}
+ if(game.inCar){
+  game.inCar=false;
+  player.position.x+=2;
+  game.car=null;
+  vehicleSpeed=0;
+  toast("Exited vehicle");
+  return;
+ }
+ interact();
+}
+
+/* =========================
+   TOUCH JOYSTICK
+========================= */
+const joy=document.getElementById("joystick");
+const stick=document.getElementById("stick");
+let joyActive=false;
+function joystickMove(e){
+ const rect=joy.getBoundingClientRect();
+ const touch=e.touches?e.touches[0]:e;
+ let dx=touch.clientX-(rect.left+rect.width/2);
+ let dy=touch.clientY-(rect.top+rect.height/2);
+ const max=40;
+ const len=Math.hypot(dx,dy);
+ if(len>max){dx=dx/len*max;dy=dy/len*max}
+ stick.style.left=(35+dx)+"px";
+ stick.style.top=(35+dy)+"px";
+ moveX=dx/max;
+ moveZ=dy/max;
+}
+function joystickEnd(){
+ joyActive=false;moveX=0;moveZ=0;
+ stick.style.left="35px";stick.style.top="35px";
+}
+joy.addEventListener("touchstart",e=>{joyActive=true;joystickMove(e)},{passive:false});
+joy.addEventListener("touchmove",e=>{if(joyActive){e.preventDefault();joystickMove(e)}},{passive:false});
+joy.addEventListener("touchend",joystickEnd);
+joy.addEventListener("mousedown",e=>{joyActive=true;joystickMove(e)});
+window.addEventListener("mousemove",e=>{if(joyActive)joystickMove(e)});
+window.addEventListener("mouseup",joystickEnd);
+
+/* =========================
+   UI SYSTEM
+========================= */
+function toast(msg){
+ const t=document.getElementById("toast");
+ t.textContent=msg;t.style.display="block";
+ clearTimeout(t.timer);
+ t.timer=setTimeout(()=>t.style.display="none",2400);
+}
+function updateHUD(){
+ document.getElementById("money").textContent=Math.floor(game.money);
+ document.getElementById("health").textContent=Math.floor(game.health);
+ document.getElementById("hunger").textContent=Math.floor(game.hunger);
+ document.getElementById("vehicleStatus").textContent=
+  game.flying?"Flying Armor":game.inCar?game.carName:"On Foot";
+}
+function startGame(){
+ if(typeof THREE==="undefined"){alert("3D library load nahi hui. Internet check karein.");return}
+ document.getElementById("start").style.display="none";
+ game.started=true;
+ createWorld();
+ toast("Welcome to your city!");
+}
+function openPanel(type){
+ const panel=document.getElementById("panel");
+ const title=document.getElementById("panelTitle");
+ const content=document.getElementById("panelContent");
+ panel.style.display="block";
+ if(type==="phone"){
+  title.textContent="📱 Smartphone";
+  content.innerHTML=`
+   <p>Storage: ${game.usedStorage} MB / ${game.storage} MB</p>
+   <button onclick="showApps()">📲 Installed Apps</button>
+   <button onclick="showStore()">🛍 Play Store</button>
+   <button onclick="showWallet()">💰 Wallet</button>
+   <button onclick="showBank()">🏦 Banking</button>
+   <button onclick="showJobs()">💼 Jobs</button>
+   <button onclick="showFood()">🍔 Food Delivery</button>
+   <button onclick="showTaxi()">🚕 Taxi</button>
+   <button onclick="showGarage()">🚘 Garage</button>
+   <button onclick="showBusiness()">🏢 Business</button>
+   <button onclick="showArmor()">🦾 Flying Armor Rental</button>`;
+ }else if(type==="map"){
+  title.textContent="City Map & GPS";
+  content.innerHTML=`
+   <div id="mapBox"><canvas id="mapCanvas"></canvas></div>
+   <p>Current Position: ${Math.round(player.position.x)}, ${Math.round(player.position.z)}</p>
+   <button onclick="setDestination(0,0)">City Center</button>
+   <button onclick="setDestination(35,35)">Shopping Mall</button>
+   <button onclick="setDestination(-35,35)">Hospital</button>
+   <button onclick="setDestination(35,-35)">Police Station</button>`;
+  setTimeout(drawMap,50);
+ }
+}
+function closePanel(){document.getElementById("panel").style.display="none"}
+function setContent(title,html){
+ document.getElementById("panelTitle").textContent=title;
+ document.getElementById("panelContent").innerHTML=html;
+}
+function showWallet(){
+ setContent("💰 Wallet",`
+ <h3>Balance: ₹${game.money}</h3>
+ <p>Starting Balance: ₹55,000</p>
+ <button onclick="showBank()">Open Bank</button>`);
+}
+function showApps(){
+ let html="<h3>Installed Applications</h3>";
+ installedApps.forEach(a=>html+=`<p>📱 ${a}</p>`);
+ html+=`<p>Storage: ${game.usedStorage}/${game.storage} MB</p>`;
+ setContent("My Apps",html);
+}
+function showStore(){
+ let html="<h3>Available Apps</h3>";
+ apps.forEach(a=>{
+  if(installedApps.includes(a.name))return;
+  html+=`<div class="row"><span>${a.name} (${a.size} MB)</span>
+  <button onclick="installApp('${a.name}')">Install</button></div>`;
+ });
+ html+=`<hr><h3>Storage Upgrade</h3>
+ <button onclick="upgradeStorage(2048,1000)">2
+ ₹1,000</button>
+ <button onclick="upgradeStorage(8192,3000)">8 GB - ₹3,000</button>
+ <button onclick="upgradeStorage(32768,8000)">32 GB - ₹8,000</button>
+ <button onclick="upgradeStorage(65536,15000)">64 GB - ₹15,000</button>`;
+ setContent("Play Store",html);
+}
+function installApp(name){
+ const app=apps.find(a=>a.name===name);
+ if(!app)return;
+ if(game.usedStorage+app.size>game.storage){toast("Not enough storage!");return}
+ installedApps.push(name);
+ game.usedStorage+=app.size;
+ toast(name+" installed");
+ showStore();
+}
+function upgradeStorage(size,cost){
+ if(game.money<cost){toast("Not enough coins");return}
+ if(size<=game.storage){toast("Already have this storage");return}
+ game.money-=cost;game.storage=size;
+ toast("Storage upgraded!");
+ showStore();
+}
+
+/* =========================
+   BANKING
+========================= */
+function showBank(){
+ if(!game.account)game.account=String(Math.floor(1000000000+Math.random()*8999999999));
+ setContent("🏦 Virtual Bank",`
+ <h3>Account ID: ${game.account}</h3>
+ <p>Wallet: ₹${game.money}</p>
+ <label>Amount</label><input id="bankAmount" type="number" min="1" placeholder="Enter amount">
+ <button onclick="bankMove('deposit')">Deposit to Bank</button>
+ <button onclick="bankMove('withdraw')">Withdraw to Wallet</button>
+ <p id="bankInfo">Virtual bank only. No real money.</p>`);
+}
+let bankBalance=0;
+function bankMove(type){
+ const amount=Number(document.getElementById("bankAmount").value);
+ if(!Number.isFinite(amount)||amount<=0){toast("Enter valid amount");return}
+ if(type==="deposit"){
+  if(amount>game.money){toast("Insufficient wallet balance");return}
+  game.money-=amount;bankBalance+=amount;
+ }else{
+  if(amount>bankBalance){toast("Insufficient bank balance");return}
+  bankBalance-=amount;game.money+=amount;
+ }
+ showBank();updateHUD();
+}
+
+/* =========================
+   JOBS
+========================= */
+function showJobs(){
+ let html="<h3>Available Jobs</h3>";
+ jobTypes.forEach(j=>{
+  html+=`<div class="row"><span>${j.name}<br><small>Reward ₹${j.pay}</small></span>
+  <button onclick="startJob('${j.name}')">Start</button></div>`;
+ });
+ setContent("💼 Jobs",html);
+}
+function startJob(name){
+ if(game.jobBusy){toast("A job is already active");return}
+ const job=jobTypes.find(j=>j.name===name);
+ if(!job)return;
+ game.jobBusy=true;game.job=name;
+ closePanel();
+ toast(name+" started. Complete your task!");
+ setTimeout(()=>{
+  if(!game.jobBusy)return;
+  game.money+=job.pay;
+  game.jobBusy=false;game.job=null;
+  toast("Job completed! +₹"+job.pay);
+  updateHUD();
+ },20000);
+}
+
+/* =========================
+   FOOD DELIVERY
+========================= */
+const foods=[
+ {name:"Burger",price:150},
+ {name:"Pizza",price:300},
+ {name:"Indian Thali",price:250}
+];
+function showFood(){
+ let html="<h3>Order Food</h3>";
+ foods.forEach(f=>{
+  html+=`<div class="row"><span>${f.name} - ₹${f.price}</span>
+  <button onclick="orderFood('${f.name}')">Order</button></div>`;
+ });
+ setContent("🍔 Food Delivery",html);
+}
+function orderFood(name){
+ const food=foods.find(f=>f.name===name);
+ if(!food||game.money<food.price){toast("Insufficient wallet balance");return}
+ game.money-=food.price;closePanel();
+ toast("Delivery rider is on the way...");
+ setTimeout(()=>{
+  game.homeFood.push(name);
+  toast(name+" delivered to your home!");
+  updateHUD();
+ },8000);
+}
+function eatFood(){
+ if(!game.homeFood.length){toast("No food stored at home");return}
+ const f=game.homeFood.shift();
+ game.hunger=Math.min(100,game.hunger+35);
+ toast("You ate "+f);
+}
+
+/* =========================
+   TAXI SYSTEM
+========================= */
+function showTaxi(){
+ setContent("🚕 Taxi Service",`
+ <p>Choose your destination.</p>
+ <button onclick="callTaxi(0,0,'City Center')">City Center</button>
+ <button onclick="callTaxi(35,35,'Shopping Mall')">Shopping Mall</button>
+ <button onclick="callTaxi(-35,35,'Hospital')">Hospital</button>
+ <button onclick="callTaxi(35,-35,'Police Station')">Police Station</button>
+ <p>Estimated fare: ₹200</p>`);
+}
+function callTaxi(x,z,name){
+ if(game.money<200){toast("Insufficient balance");return}
+ game.money-=200;closePanel();
+ toast("Taxi is coming...");
+ const taxi=createCarMesh(0xffcc22);
+ taxi.position.set(player.position.x+12,.2,player.position.z+10);
+ scene.add(taxi);
+ let timer=0;
+ const interval=setInterval(()=>{
+  timer++;
+  taxi.position.lerp(player.position,.12);
+  if(timer>30){
+   clearInterval(interval);
+   toast("Taxi arrived. Boarding...");
+   player.position.copy(taxi.position);
+   game.inCar=true;game.car=taxi;game.carName="Taxi";
+   game.car.userData.speed=.12;
+   setTimeout(()=>{
+    const start=taxi.position.clone();
+    let step=0;
+    const journey=setInterval(()=>{
+     step++;
+     taxi.position.lerp(new THREE.Vector3(x,.2,z),.025);
+     player.position.copy(taxi.position);
+     if(step>100){
+      clearInterval(journey);
+      game.inCar=false;game.car=null;
+      player.position.set(x,0,z);
+      scene.remove(taxi);
+      toast("Reached "+name);
+      updateHUD();
+     }
+    },50);
+   },1500);
+  }
+ },100);
+}
+
+/* =========================
+   GARAGE & CARS
+========================= */
+function showGarage(){
+ let html="<h3>Car Showroom</h3>";
+ carTypes.forEach((c,i)=>{
+  html+=`<div class="row"><span>${c.name}<br>₹${c.price}</span>
+  <button onclick="buyCar(${i})">Buy</button></div>`;
+ });
+ html+="<hr><h3>Your Vehicles</h3>";
+ game.ownedCars.forEach((c,i)=>{
+  html+=`<button onclick="spawnCar(${i})">Spawn ${c.name}</button>`;
+ });
+ setContent("🚘 Garage",html);
+}
+function buyCar(i){
+ const c=carTypes[i];
+ if(game.money<c.price){toast("Not enough money");return}
+ game.money-=c.price;
+ game.ownedCars.push({...c});
+ toast(c.name+" purchased!");
+ showGarage();updateHUD();
+}
+function spawnCar(i){
+ if(game.inCar||game.flying){toast("Exit current vehicle first");return}
+ const data=game.ownedCars[i];
+ const car=createCarMesh(data.color);
+ car.position.set(player.position.x+3,.2,player.position.z);
+ car.userData.name=data.name;
+ car.userData.speed=data.speed;
+ scene.add(car);cars.push(car);
+ game.car=car;game.inCar=true;game.carName=data.name;
+ closePanel();toast(data.name+" spawned. Press F to exit");
+}
+
+/* =========================
+   RENTAL BUSINESS
+========================= */
+const rentRates=[
+ {name:"Basic Hatchback",rate:250},
+ {name:"Sedan",rate:500},
+ {name:"SUV",rate:900},
+ {name:"Sports Car",rate:1800},
+ {name:"Supercar",rate:3500},
+ {name:"Hypercar",rate:6000}
+];
+function showBusiness(){
+ let html="<h3>Car Rental Business</h3>";
+ game.ownedCars.forEach((c,i)=>{
+  const listed=game.rentalCars.some(r=>r.index===i);
+  const rate=rentRates.find(r=>r.name===c.name)?.rate||250;
+  html+=`<p>${c.name} - ₹${rate}/day</p>`;
+  html+=listed?`<button onclick="removeListing(${i})">Remove Listing</button>`:
+  `<button onclick="listCar(${i},${rate})">List for Rent</button>`;
+ });
+ html+=`<hr><p>Business income: ₹${game.businessIncome}</p>
+ <button onclick="collectBusiness()">Collect Daily Rent</button>`;
+ setContent("🏢 Business",html);
+}
+function listCar(index,rate){
+ if(game.rentalCars.some(r=>r.index===index)){toast("Already listed");return}
+ game.rentalCars.push({index,rate});
+ toast("Car listed for rental");
+ showBusiness();
+}
+function removeListing(index){
+ game.rentalCars=game.rentalCars.filter(r=>r.index!==index);
+ toast("Listing removed");showBusiness();
+}
+function collectBusiness(){
+ const today=Math.floor(Date.now()/86400000);
+ if(game.lastBusinessDay===today){toast("Today's rent already collected");return}
+ if(!game.rentalCars.length){toast("No cars listed");return}
+ let income=0;
+ game.rentalCars.forEach(r=>income+=r.rate);
+ game.lastBusinessDay=today;
+ game.businessIncome+=income;game.money+=income;
+ toast("Daily rent collected: ₹"+income);
+ showBusiness();updateHUD();
+}
+
+/* =========================
+   HOME
+========================= */
+function showHome(){
+ setContent("🏠 My Home",`
+ <p>Welcome to your home.</p>
+ <p>Food stored: ${game.homeFood.length}</p>
+ <button onclick="eatFood()">🍽 Eat Food</button>
+ <button onclick="restHome()">🛏 Rest</button>
+ <button onclick="upgradeHome()">🛋 Home Upgrade - ₹2,000</button>`);
+}
+function restHome(){
+ game.health=100;game.hunger=Math.min(100,game.hunger+20);
+ toast("You rested at home");
+ updateHUD();
+}
+function upgradeHome(){
+ if(game.money<2000){toast("Not enough money");return}
+ game.money-=2000;toast("Home furniture upgraded");
+ updateHUD();showHome();
+}
+
+/* =========================
+   FLYING ARMOR RENTAL
+========================= */
+function showArmor(){
+ setContent("🦾 Flying Armor Rental",`
+ <h3>Red-Gold Powered Armor</h3>
+ <p>Original superhero-inspired flying suit.</p>
+ <p>Rental price: ₹500 per minute</p>
+ <p>Assembly time: up to 10 seconds</p>
+ <button onclick="rentArmor(1)">Rent for 1 Minute - ₹500</button>
+ <button onclick="rentArmor(3)">Rent for 3 Minutes - ₹1,500</button>
+ <button onclick="rentArmor(5)">Rent for 5 Minutes - ₹2,500</button>
+ <p class="small">Armor has flight controls. No real-money purchase.</p>`);
+}
+function makeArmorPart(color,size){
+ const mesh=new THREE.Mesh(
+  new THREE.BoxGeometry(size[0],size[1],size[2]),
+  new THREE.MeshStandardMaterial({
+   color,metalness:.85,roughness:.2,
+   emissive:color,emissiveIntensity:.08
+  })
+ );
+ mesh.castShadow=true;
+ return mesh;
+}
+function rentArmor(minutes){
+ if(game.armor||game.flying){toast("Armor already active");return}
+ if(game.inCar){toast("Exit vehicle before renting armor");return}
+ const cost=minutes*500;
+ if(game.money<cost){toast("Not enough coins");return}
+ game.money-=cost;
+ game.armor={minutes};
+ game.armorTime=minutes*60;
+ closePanel();
+ toast("Armor dispatched! Parts are arriving...");
+ createArmorParts();
+ updateHUD();
+}
+function createArmorParts(){
+ const red=0xb51e28,gold=0xe6a928;
+ const parts=[
+  {name:"Chest",color:red,size:[.95,1.1,.65],offset:[0,1.6,0]},
+  {name:"Helmet",color:red,size:[.75,.8,.75],offset:[0,2.6,0]},
+  {name:"Left Arm",color:red,size:[.3,.9,.35],offset:[-.68,1.6,0]},
+  {name:"Right Arm",color:red,size:[.3,.9,.35],offset:[.68,1.6,0]},
+  {name:"Left Leg",color:red,size:[.38,.9,.4],offset:[-.25,.55,0]},
+  {name:"Right Leg",color:red,size:[.38,.9,.4],offset:[.25,.55,0]},
+  {name:"Left Shoulder",color:gold,size:[.42,.35,.48],offset:[-.65,2.05,0]},
+  {name:"Right Shoulder",color:gold,size:[.42,.35,.48],offset:[.65,2.05,0]}
+ ];
+ game.armorParts=[];
+ parts.forEach((p,i)=>{
+  const mesh=makeArmorPart(p.color,p.size);
+  mesh.position.set(
+   player.position.x+(Math.random()-.5)*35,
+   player.position.y+8+Math.random()*12,
+   player.position.z+(Math.random()-.5)*35
+  );
+  scene.add(mesh);
+  game.armorParts.push({mesh,offset:p.offset,index:i,attached:false});
+ });
+ let partIndex=0;
+ const attach=setInterval(()=>{
+  if(partIndex>=game.armorParts.length){
+   clearInterval(attach);
+   game.flying=true;
+   player.position.y=2;
+   toast("Armor assembled! Flight enabled.");
+   return;
+  }
+  const part=game.armorParts[partIndex];
+  part.attached=true;
+  partIndex++;
+ },1100);
+ game.armorAttachTimer=attach;
+}
+function updateArmor(dt){
+ if(!game.armor)return;
+ game.armorParts.forEach(p=>{
+  if(p.attached){
+   const target=new THREE.Vector3(
+    player.position.x+p.offset[0],
+    player.position.y+p.offset[1],
+    player.position.z+p.offset[2]
+   );
+   p.mesh.position.lerp(target,.18);
+   p.mesh.rotation.y=player.rotation.y;
+  }else{
+   p.mesh.position.lerp(
+    new THREE.Vector3(player.position.x,player.position.y+2,player.position.z),.025
+   );
+  }
+ });
+ if(game.flying){
+  game.armorTime-=dt;
+  if(game.armorTime<=0)endArmor();
+ }
+}
+function endArmor(){
+ if(!game.armor)return;
+ game.flying=false;
+ game.armorParts.forEach(p=>scene.remove(p.mesh));
+ game.armorParts=[];
+ game.armor=null;
+ player.position.y=0;
+ toast("Rental ended. Armor returned.");
+}
+function showArmorStatus(){
+ if(!game.armor){toast("No active armor");return}
+ toast("Armor remaining: "+Math.ceil(game.armorTime)+" seconds");
+}
+
+/* =========================
+   SETTINGS
+========================= */
+function showSettings(){
+ setContent("⚙ Settings",`
+ <h3>Graphics Quality</h3>
+ <button onclick="setGraphics(1)">Low</button>
+ <button onclick="setGraphics(1.3)">Medium</button>
+ <button onclick="setGraphics(1.7)">High</button>
+ <button onclick="saveGame()">💾 Save Game</button>
+ <button onclick="loadGame()">📂 Load Game</button>`);
+}
+function setGraphics(value){
+ renderer.setPixelRatio(Math.min(devicePixelRatio,value));
+ toast("Graphics setting updated");
+}
+
+/* =========================
+   SAVE / LOAD
+========================= */
+function saveGame(){
+ const data={
+  money:game.money,health:game.health,hunger:game.hunger,
+  storage:game.storage,usedStorage:game.usedStorage,
+  installedApps,ownedCars:game.ownedCars,
+  homeFood:game.homeFood,bankBalance,account:game.account
+ };
+ try{
+  localStorage.setItem("indianLifeSimP5",JSON.stringify(data));
+   toast("Game saved on this device");
+ }catch(e){toast("Save failed")}
+}
+function loadGame(){
+ try{
+  const raw=localStorage.getItem("indianLifeSimP5");
+  if(!raw){toast("No saved game found");return}
+  const d=JSON.parse(raw);
+  game.money=d.money??game.money;
+  game.health=d.health??100;
+  game.hunger=d.hunger??100;
+  game.storage=d.storage??500;
+  game.usedStorage=d.usedStorage??260;
+  installedApps=d.installedApps||installedApps;
+  game.ownedCars=d.ownedCars||[];
+  game.homeFood=d.homeFood||[];
+  bankBalance=d.bankBalance||0;
+  game.account=d.account||"";
+  toast("Saved game loaded");
+  updateHUD();
+ }catch(e){toast("Save data could not be loaded")}
+}
+
+/* =========================
+   MAP
+========================= */
+function drawMap(){
+ const canvas=document.getElementById("mapCanvas");
+ if(!canvas)return;
+ const ctx=canvas.getContext("2d");
+ canvas.width=canvas.clientWidth*2;
+ canvas.height=canvas.clientHeight*2;
+ ctx.fillStyle="#244b3b";
+ ctx.fillRect(0,0,canvas.width,canvas.height);
+ ctx.strokeStyle="#aab9bd";ctx.lineWidth=12;
+ ctx.beginPath();
+ ctx.moveTo(canvas.width/2,0);ctx.lineTo(canvas.width/2,canvas.height);
+ ctx.moveTo(0,canvas.height/2);ctx.lineTo(canvas.width,canvas.height/2);
+ ctx.stroke();
+ ctx.fillStyle="#fff";
+ const px=canvas.width/2+player.position.x*1.4;
+ const pz=canvas.height/2+player.position.z*1.4;
+ ctx.beginPath();ctx.arc(px,pz,9,0,Math.PI*2);ctx.fill();
+ ctx.fillText("YOU",px+10,pz-10);
+}
+function setDestination(x,z){
+ targetPosition.set(x,0,z);
+ toast("GPS destination set");
+}
+
+/* =========================
+   DAILY TIME
+========================= */
+setInterval(()=>{
+ if(!game.started)return;
+ game.day++;
+},120000);
+
+</script>
+</body>
+</html>
+ 
