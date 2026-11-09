@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Indian Roblox Simulator - Prototype 4</title>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101827;color:white;font-family:Arial,sans-serif;overflow:hidden}
+canvas{display:block}
+#hud{position:fixed;top:10px;left:10px;z-index:5;background:#101827dd;padding:12px;border-radius:14px;border:1px solid #38bdf8;font-size:13px}
+#phoneButton{position:fixed;right:15px;bottom:20px;z-index:8;background:#0ea5e9;border:0;border-radius:50%;width:65px;height:65px;color:white;font-size:24px}
+#panel{position:fixed;z-index:10;right:10px;top:10px;bottom:10px;width:min(370px,94vw);background:#0b1220f5;border:1px solid #38bdf8;border-radius:18px;padding:15px;overflow-y:auto;display:none}
+#panel h2{margin:5px 0 12px;color:#38bdf8}
+#panel button{background:#075985;color:white;border:1px solid #38bdf8;padding:10px;border-radius:9px;margin:4px;cursor:pointer}
+#panel button:disabled{opacity:.4}
+#panel .close{background:#991b1b;border-color:#ef4444;float:right}
+#panel .item{background:#172235;border:1px solid #334155;border-radius:12px;padding:10px;margin:8px 0}
+#panel input,#panel select{width:100%;padding:10px;border-radius:8px;background:#172235;color:white;border:1px solid #38bdf8;margin:6px 0}
+#message{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#020617dd;padding:10px 18px;border-radius:12px;z-index:7;display:none;text-align:center}
+#controls{position:fixed;left:15px;bottom:15px;z-index:5;display:grid;grid-template-columns:50px 50px 50px;gap:5px}
+#controls button{height:45px;background:#0f172acc;color:white;border:1px solid #38bdf8;border-radius:10px;font-size:18px}
+#actions{position:fixed;left:15px;bottom:175px;z-index:5}
+#actions button{background:#0369a1;color:white;border:1px solid #38bdf8;border-radius:9px;padding:9px;margin:3px}
+#start{position:fixed;inset:0;z-index:20;background:linear-gradient(#020617dd,#0f172a);display:flex;align-items:center;justify-content:center;text-align:center;padding:20px}
+#start button{padding:15px 28px;border:0;border-radius:12px;background:#0284c7;color:white;font-size:20px}
+</style>
+</head>
+
+<body>
+<div id="start">
+  <div>
+    <h1>🇮🇳 Indian Roblox Simulator</h1>
+    <h3>Prototype 4 — City Life & Business</h3>
+    <p>Explore • Drive • Work • Banking • Taxi Business</p>
+    <button onclick="startGame()">START GAME</button>
+  </div>
+</div>
+
+<div id="hud">
+  <b>INDIAN CITY LIFE</b><br>
+  💰 Wallet: ₹<span id="wallet">5000</span><br>
+  🏦 Bank: ₹<span id="bank">0</span><br>
+  🚗 Car: <span id="carName">Starter Hatchback</span><br>
+  ⛽ Fuel: <span id="fuel">100</span>%<br>
+  📱 Storage: <span id="storage">260</span>/500 MB
+</div>
+
+<button id="phoneButton" onclick="openPhone()">📱</button>
+
+<div id="controls">
+  <div></div><button onpointerdown="move('forward')" onpointerup="stopMove()">▲</button><div></div>
+  <button onpointerdown="move('left')" onpointerup="stopMove()">◀</button>
+  <button onpointerdown="move('back')" onpointerup="stopMove()">▼</button>
+  <button onpointerdown="move('right')" onpointerup="stopMove()">▶</button>
+</div>
+
+<div id="actions">
+  <button onclick="jump()">JUMP</button>
+  <button onclick="toggleVehicle()">🚗 DRIVE / EXIT</button>
+</div>
+
+<div id="panel">
+  <button class="close" onclick="closePanel()">CLOSE ✕</button>
+  <div id="panelContent"></div>
+</div>
+
+<div id="message"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+
+<script>
+/* =========================================================
+   INDIAN ROBLOX SIMULATOR - PROTOTYPE 4
+   Single HTML file
+   ========================================================= */
+
+let scene,camera,renderer,player,carObject;
+let started=false,driving=false;
+let moveDirection="";
+let wallet=5000,bank=0,fuel=100;
+let currentCar="Starter Hatchback";
+let playerCarOwned=["Starter Hatchback"];
+let ownedCars=["Starter Hatchback"];
+let rentalCars=[];
+let bankCard=false;
+let bankID="IND-"+Math.floor(100000+Math.random()*900000);
+let installedApps=["Wallet","Maps & GPS","Settings","Play Store"];
+let phoneStorage=500;
+let usedStorage=260;
+let deliveryStorage=[];
+let inventory=[];
+let carRentRate={};
+let carRentIncome=0;
+let lastRentDay=0;
+let gameDay=1;
+let currentPanel="";
+let playerSpeed=0.10;
+let playerY=0;
+
+const apps=[
+ {name:"Wallet",size:35,base:true,desc:"Manage your virtual wallet."},
+ {name:"Maps & GPS",size:120,base:true,desc:"Explore the city and navigate."},
+ {name:"Settings",size:25,base:true,desc:"Graphics, controls and phone settings."},
+ {name:"Play Store",size:80,base:true,desc:"Download and manage apps."},
+ {name:"Food Delivery",size:140,desc:"Order food and receive home deliveries."},
+ {name:"Music",size:90,desc:"Play music using direct audio links."},
+ {name:"Jobs",size:110,desc:"Work and earn virtual money."},
+ {name:"Taxi",size:160,desc:"Book NPC taxis and travel."},
+ {name:"Garage",size:130,desc:"Fuel, repair and customize cars."},
+ {name:"Shopping",size:120,desc:"Buy phones, cars and upgrades."},
+ {name:"Social",size:150,desc:"Interact with NPCs."},
+ {name:"Banking",size:100,desc:"Bank account and virtual debit card."}
+];
+
+const carCatalog=[
+ {name:"Starter Hatchback",price:0,speed:1,rent:250},
+ {name:"City Sedan",price:20000,speed:1.4,rent:500},
+ {name:"Family SUV",price:50000,speed:1.8,rent:900},
+ {name:"Sports Car",price:100000,speed:2.5,rent:1800},
+ {name:"Supercar",price:250000,speed:3.5,rent:3500},
+ {name:"Hypercar",price:500000,speed:5,rent:6000}
+];
+
+const phoneCatalog=[
+ {name:"Basic Phone",price:0,storage:500},
+ {name:"Phone Plus",price:10000,storage:2000},
+ {name:"Pro Phone",price:25000,storage:8000},
+ {name:"Ultra Phone",price:60000,storage:32000},
+ {name:"Gaming Phone",price:100000,storage:64000}
+];
+
+function startGame(){
+ document.getElementById("start").style.display="none";
+ started=true;
+ init3D();
+ updateHUD();
+ showMessage("Welcome! Explore your Indian city.");
+}
+
+function init3D(){
+ scene=new THREE.Scene();
+ scene.background=new THREE.Color(0x87ceeb);
+ scene.fog=new THREE.Fog(0x87ceeb,60,260);
+
+ camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.1,500);
+ renderer=new THREE.WebGLRenderer({antialias:true});
+ renderer.setSize(innerWidth,innerHeight);
+ renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
+ renderer.shadowMap.enabled=true;
+ document.body.appendChild(renderer.domElement);
+
+ const ambient=new THREE.HemisphereLight(0xffffff,0x64748b,2);
+ scene.add(ambient);
+ const sun=new THREE.DirectionalLight(0xffffff,2);
+ sun.position.set(60,100,50);
+ sun.castShadow=true;
+ scene.add(sun);
+
+ createCity();
+ createPlayer();
+ createCar();
+
+ camera.position.set(0,5,9);
+ animate();
+
+ window.addEventListener("resize",()=>{
+ camera.aspect=innerWidth/innerHeight;
+ camera.updateProjectionMatrix();
+ renderer.setSize(innerWidth,innerHeight);
+ });
+}
+
+function mat(color){
+ return new THREE.MeshStandardMaterial({color,roughness:0.8});
+}
+
+function createCity(){
+ const ground=new THREE.Mesh(
+ new THREE.PlaneGeometry(500,500),
+ mat(0x4b9654)
+ );
+ ground.rotation.x=-Math.PI/2;
+ ground.receiveShadow=true;
+ scene.add(ground);
+
+ // Road network
+ for(let i=-160;i<=160;i+=40){
+ const road1=new THREE.Mesh(new THREE.BoxGeometry(500,0.12,12),mat(0x30343b));
+ road1.position.set(0,0.05,i);
+ scene.add(road1);
+
+ const road2=new THREE.Mesh(new THREE.BoxGeometry(12,0.12,500),mat(0x30343b));
+ road2.position.set(i,0.05,0);
+ scene.add(road2);
+ }
+
+ // Buildings placed in blocks, avoiding road lanes
+ for(let x=-140;x<=140;x+=40){
+ for(let z=-140;z<=140;z+=40){
+ if(Math.abs(x)<20&&Math.abs(z)<20)continue;
+ const h=8+Math.random()*24;
+ const w=10+Math.random()*8;
+ const d=10+Math.random()*8;
+ const colors=[0xe7b98c,0xf1d5b5,0xd5e5ed,0xe9a3a3,0xb7d6a4,0xc5b8e8];
+ const building=new THREE.Mesh(
+ new THREE.BoxGeometry(w,h,d),
+ mat(colors[Math.floor(Math.random()*colors.length)])
+ );
+ building.position.set(x+(Math.random()*8-4),h/2,z+(Math.random()*8-4));
+ building.castShadow=true;
+ building.receiveShadow=true;
+ scene.add(building);
+
+ // Windows
+ for(let yy=3;yy<h;yy+=4){
+ for(let xx=-w/2+2;xx<w/2;xx+=3){
+ const win=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.2,0.15),mat(0x64c7ff));
+ win.position.set(building.position.x+xx,yy,building.position.z+d/2+0.08);
+ scene.add(win);
+ }
+ }
+ }
+ }
+
+ // Park
+ const park=new THREE.Mesh(new THREE.BoxGeometry(28,0.2,28),mat(0x2e8b57));
+ park.position.set(25,0.12,25);
+ scene.add(park);
+
+ // Trees
+ for(let i=0;i<24;i++){
+ const x=(Math.random()-0.5)*35+25;
+ const z=(Math.random()-0.5)*35+25;
+ const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.35,.5,3),mat(0x795548));
+ trunk.position.set(x,1.5,z);
+ scene.add(trunk);
+ const leaves=new THREE.Mesh(new THREE.SphereGeometry(2.2,8,8),mat(0x16803c));
+ leaves.position.set(x,4,z);
+ scene.add(leaves);
+ }
+}
+
+function createPlayer(){
+ player=new THREE.Group();
+ const body=new THREE.Mesh(new THREE.BoxGeometry(1,1.5,.6),mat(0x2563eb));
+ body.position.y=1.2;
+ body.castShadow=true;
+ player.add(body);
+
+ const head=new THREE.Mesh(new THREE.BoxGeometry(.8,.8,.8),mat(0xf1c27d));
+ head.position.y=2.35;
+ player.add(head);
+
+ const legs=[];
+ for(let i=-1;i<=1;i+=2){
+ const leg=new THREE.Mesh(new THREE.BoxGeometry(.3,.8,.3),mat(0x1e293b));
+ leg.position.set(i*.22,.4,0);
+ player.add(leg);
+ legs.push(leg);
+ }
+ player.position.set(0,0,0);
+ scene.add(player);
+}
+
+function createCar(){
+ carObject=new THREE.Group();
+ const body=new THREE.Mesh(new THREE.BoxGeometry(2.4,.8,4),mat(0x0876d1));
+ body.position.y=.8;
+ body.castShadow=true;
+ carObject.add(body);
+
+ const cabin=new THREE.Mesh(new THREE.BoxGeometry(1.8,.8,1.8),mat(0x8ed7ff));
+ cabin.position.set(0,1.45,-.3);
+ carObject.add(cabin);
+
+ for(let x of [-1.1,1.1]){
+ for(let z of [-1.3,1.3]){
+ const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.4,.4,.3,12),mat(0x151515));
+ wheel.rotation.z=Math.PI/2;
+ wheel.position.set(x,.4,z);
+ carObject.add(wheel);
+ }
+ }
+ carObject.position.set(4,0,0);
+ scene.add(carObject);
+}
+
+function animate(){
+ requestAnimationFrame(animate);
+ if(!started)return;
+
+ if(driving){
+ if(moveDirection==="forward")carObject.position.z-=playerSpeed*2;
+ if(moveDirection==="back")carObject.position.z+=playerSpeed;
+ if(moveDirection==="left")carObject.rotation.y+=.035;
+ if(moveDirection==="right")carObject.rotation.y-=.035;
+
+ player.position.copy(carObject.position);
+ player.position.y=0;
+ }else{
+ if(moveDirection==="forward")player.position.z-=playerSpeed;
+ if(moveDirection==="back")player.position.z+=playerSpeed;
+ if(moveDirection==="left")player.position.x-=playerSpeed;
+ if(moveDirection==="right")player.position.x+=playerSpeed;
+ }
+
+ const target=driving?carObject.position:player.position;
+ camera.position.lerp(new THREE.Vector3(target.x,target.y+5,target.z+9),.08);
+ camera.lookAt(target.x,target.y+1,target.z);
+
+ renderer.render(scene,camera);
+}
+
+function move(dir){moveDirection=dir}
+function stopMove(){moveDirection=""}
+function jump(){
+ if(driving){showMessage("Exit the car to jump.");return}
+ player.position.y=2;
+ setTimeout(()=>player.position.y=0,450);
+}
+function toggleVehicle(){
+ if(driving){
+ driving=false;
+ player.position.x=carObject.position.x+3;
+ player.position.z=carObject.position.z;
+ showMessage("You exited your car.");
+ }else{
+ const dist=player.position.distanceTo(carObject.position);
+ if(dist<8){
+ driving=true;
+ showMessage("You entered your car!");
+ }else showMessage("Come closer to your car.");
+ }
+}
+
+function updateHUD(){
+ document.getElementById("wallet").textContent=Math.floor(wallet);
+ document.getElementById("bank").textContent=Math.floor(bank);
+ document.getElementById("carName").textContent=currentCar;
+ document.getElementById("fuel").textContent=Math.floor(fuel);
+ document.getElementById("storage").textContent=usedStorage+"/"+phoneStorage;
+}
+
+function showMessage(msg){
+ const el=document.getElementById("message");
+ el.textContent=msg;
+ el.style.display="block";
+ setTimeout(()=>el.style.display="none",2600);
+}
+
+function openPhone(){
+ showPanel("phone");
+}
+
+function showPanel(name){
+ currentPanel=name;
+ const panel=document.getElementById("panel");
+ const content=document.getElementById("panelContent");
+ panel.style.display="block";
+ content.innerHTML="";
+
+ if(name==="phone"){
+ content.innerHTML="<h2>📱 My Phone</h2><p>Storage: "+usedStorage+" / "+phoneStorage+" MB</p>";
+ installedApps.forEach(app=>{
+ content.innerHTML+=`<button onclick="openApp('${app}')">${app}</button>`;
+ });
+ content.innerHTML+="<hr><button onclick=\"showPanel('store')\">Play Store</button>";
+ }
+
+ if(name==="store"){
+ content.innerHTML="<h2>🛍️ Play Store</h2><p>Install and uninstall applications.</p>";
+ apps.forEach(app=>{
+ const installed=installedApps.includes(app.name);
+ content.innerHTML+=`
+ <div class="item">
+ <b>${app.name}</b> — ${app.size} MB
+ <p>${app.desc}</p>
+ ${installed?
+ (app.base?"<button disabled>Pre-installed</button>":
+ `<button onclick="uninstallApp('${app.name}')">Uninstall</button>`):
+ `<button onclick="installApp('${app.name}')">Install</button>`}
+ </div>`;
+ });
+ }
+
+ if(name==="bank"){
+ content.innerHTML=`
+ <h2>🏦 Virtual Banking</h2>
+ <div class="item">
+ <b>Bank Identity:</b> ${bankID}<br>
+ <b>Bank Balance:</b> ₹${bank}<br>
+ <b>Virtual Card:</b> ${bankCard?"Active":"Not issued"}
+ </div>
+ <button onclick="deposit()">Deposit Wallet → Bank</button>
+ <button onclick="withdraw()">Withdraw Bank → Wallet</button>
+ <button onclick="issueCard()">Get Virtual Card</button>
+ <button onclick="cardPayment()">Pay with Card</button>`;
+ }
+
+ if(name==="shopping"){
+ content.innerHTML="<h2>🛒 Shopping & Showroom</h2><h3>🚘 Cars</h3>";
+ carCatalog.forEach(car=>{
+ const own=ownedCars.includes(car.name);
+ content.innerHTML+=`
+ <div class="item">
+ <b>${car.name}</b><br>
+ Speed Level: ${car.speed}<br>
+ Price: ₹${car.price}<br>
+ Daily Rent Potential: ₹${car.rent}<br>
+ ${own?`<button onclick="selectCar('${car.name}')">Select Car</button>`:
+ `<button onclick="buyCar('${car.name}')">Buy Car</button>`}
+ </div>`;
+ });
+
+ content+="<h3>📱 Phone Upgrade</h3>";
+ phoneCatalog.forEach(phone=>{
+ content+=`
+ <div class="item">
+ <b>${phone.name}</b><br>
+ Storage: ${phone.storage} MB<br>
+ Price: ₹${phone.price}<br>
+ <button onclick="buyPhone('${phone.name}')">Buy / Upgrade</button>
+ </div>`;
+ });
+ }
+
+ if(name==="rental"){
+ content.innerHTML="<h2>🚖 Car Rental Business</h2>";
+ content+="<p>Rent out cars you are not using. Virtual daily rent is collected in your wallet.</p>";
+ ownedCars.forEach(car=>{
+ const details=carCatalog.find(c=>c.name===car);
+ const rate=carRentRate[car]||details.rent;
+ const active=rentalCars.includes(car);
+ content+=`
+ <div class="item">
+ <b>${car}</b><br>
+ Daily Rent: ₹${rate}<br>
+ Status: ${active?"Rented":"Available"}<br>
+ <button onclick="setRent('${car}')">${active?"Stop Renting":"Rent Out Car"}</button>
+ <button onclick="setRentRate('${car}')">Set Daily Rent</button>
+ </div>`;
+ });
+ content+=`<button onclick="collectRent()">Collect Daily Rental Income</button>`;
+ }
+
+ if(name==="taxibiz"){
+ content.innerHTML=`
+ <h2>🚕 Taxi Business</h2>
+ <p>Grow your taxi company by buying cars and hiring NPC drivers.</p>
+ <p>Owned Cars: ${ownedCars.length}</p>
+ <p>Business Earnings: ₹${carRentIncome}</p>
+ <button onclick="showPanel('shopping')">Buy More Cars</button>
+ <button onclick="collectTaxiIncome()">Collect Taxi Earnings</button>`;
+ }
+
+ if(name==="food"){
+ content.innerHTML="<h2>🍔 Food Delivery</h2><p>Choose food to order.</p>";
+ ["Burger","Pizza","Indian Thali"].forEach(food=>{
+ const price=food==="Burger"?150:food==="Pizza"?300:250;
+ content+=`<div class="item"><b>${food}</b> ₹${price}<br>
+ <button onclick="orderFood('${food}',${price})">Order</button></div>`;
+ });
+ content+="<h3>🏠 Home Delivery Storage</h3>";
+ deliveryStorage.forEach((food,i)=>{
+ content+=`<div class="item">${food}<button onclick="collectFood(${i})">Collect Food</button></div>`;
+ });
+ }
+
+ if(name==="taxi"){
+ content.innerHTML=`
+ <h2>🚕 Taxi Service</h2>
+ <p>NPC taxi will pick you up and take you to the destination.</p>
+ <button onclick="bookTaxi()">Book Taxi — ₹200</button>`;
+ }
+
+ if(name==="jobs"){
+ content.innerHTML="<h2>💼 Jobs</h2>";
+ [["Delivery Worker",500],["Taxi Driver",800],["Restaurant Worker",600],["Office Worker",1000]].forEach(j=>{
+ content+=`<div class="item"><b>${j[0]}</b><br>Salary: ₹${j[1]}<br>
+ <button onclick="workJob('${j[0]}',${j[1]})">Start Job</button></div>`;
+ });
+ }
+
+ if(name==="garage"){
+ content.innerHTML=`
+ <h2>🔧 Garage</h2>
+ <p>Fuel: ${fuel}%</p>
+ <button onclick="refuel()">Refuel — ₹300</button>
+ <button onclick="repairCar()">Repair Car — ₹500</button>
+ <button onclick="paintCar()">Change Car Color</button>`;
+ }
+
+ if(name==="maps"){
+ content.innerHTML="<h2>🗺️ City GPS</h2><p>City destinations:</p>";
+ ["Home","Restaurant","Petrol Pump","Car Showroom","City Park","Bank"].forEach(place=>{
+ content+=`<button onclick="navigate('${place}')">${place}</button>`;
+ });
+ }
+
+ if(name==="settings"){
+ content.innerHTML=`
+ <h2>⚙️ Settings</h2>
+ <label>Graphics Quality</label>
+ <select onchange="setGraphics(this.value)">
+ <option>Low</option><option selected>Medium</option><option>High</option>
+ </select>
+ <label>Camera Sensitivity</label>
+ <input type="range" min="1" max="10" value="5">
+ <button onclick="showPanel('phone')">Phone Storage Management</button>`;
+ }
+
+ if(name==="music"){
+ content.innerHTML=`
+ <h2>🎵 Music Player</h2>
+ <input id="audioURL" placeholder="Paste direct audio URL">
+ <audio id="audioPlayer" controls style="width:100%"></audio>
+ <button onclick="playMusic()">Play URL</button>`;
+ }
+
+ if(name==="social"){
+ content.innerHTML="<h2>👥 Social</h2><p>Talk with NPCs around the city.</p><button onclick=\"showMessage('NPC says: Namaste! Welcome to our city.')\">Talk to NPC</button>";
+ }
+}
+
+function closePanel(){
+ document.getElementById("panel").style.display="none";
+ currentPanel="";
+}
+
+function openApp(name){
+ if(name==="Play Store"){showPanel("store");return}
+ if(name==="Wallet"){
+ showPanel("phone");
+ document.getElementById("panelContent").innerHTML=
+ `<h2>💰 Wallet</h2><p>Virtual Wallet: ₹${wallet}</p>
+ <button onclick="showPanel('bank')">Banking</button>`;
+ return;
+ }
+ const map={
+ "Banking":"bank","Shopping":"shopping","Food Delivery":"food",
+ "Taxi":"taxi","Jobs":"jobs","Garage":"garage",
+ "Maps & GPS":"maps","Settings":"settings","Music":"music",
+ "Social":"social"
+ };
+ if(map[name])showPanel(map[name]);
+ else showMessage("App opening: "+name);
+}
+
+function installApp(name){
+ const app=apps.find(a=>a.name===name);
+ if(!app)return;
+ if(wallet<100){showMessage("Not enough wallet money for installation.");return}
+ if(usedStorage+app.size>phoneStorage){
+ showMessage("Not enough phone storage! Upgrade phone or uninstall apps.");
+ return;
+ }
+ installedApps.push(name);
+ usedStorage+=app.size;
+ wallet-=100;
+ updateHUD();
+ showPanel("store");
+ showMessage(name+" installed successfully.");
+}
+
+function uninstallApp(name){
+ const app=apps.find(a=>a.name===name);
+ if(!app||app.base)return;
+ installedApps=installedApps.filter(a=>a!==name);
+ usedStorage-=app.size;
+ updateHUD();
+ showPanel("store");
+ showMessage(name+" uninstalled. Storage freed.");
+}
+
+function deposit(){
+ const amount=Number(prompt("Deposit amount from wallet:"));
+ if(amount>0&&amount<=wallet){
+ wallet-=amount;bank+=amount;updateHUD();showPanel("bank");
+ showMessage("Money deposited into virtual bank.");
+ }else showMessage("Invalid amount.");
+}
+
+function withdraw(){
+ const amount=Number(prompt("Withdraw amount from bank:"));
+ if(amount>0&&amount<=bank){
+ bank-=amount;wallet+=amount;updateHUD();showPanel("bank");
+ showMessage("Money withdrawn to wallet.");
+ }else showMessage("Invalid amount.");
+}
+
+function issueCard(){
+ bankCard=true;
+ showPanel("bank");
+ showMessage("Virtual bank card issued!");
+}
+
+function cardPayment(){
+ if(!bankCard){showMessage("Get your virtual bank card first.");return}
+ const amount=Number(prompt("Virtual card payment amount:"));
+ if(amount>0&&amount<=bank){
+ bank-=amount;updateHUD();showPanel("bank");
+ showMessage("Virtual payment completed.");
+ }else showMessage("Payment declined.");
+}
+
+function buyCar(name){
+ const car=carCatalog.find(c=>c.name===name);
+ if(wallet<car.price){showMessage("Not enough virtual money.");return}
+ wallet-=car.price;
+ ownedCars.push(name);
+ carRentRate[name]=car.rent;
+ updateHUD();
+ showPanel("shopping");
+ showMessage(name+" purchased!");
+}
+
+function selectCar(name){
+ currentCar=name;
+ const details=carCatalog.find(c=>c.name===name);
+ playerSpeed=.10*details.speed;
+ updateHUD();
+ showPanel("shopping");
+ showMessage("Selected "+name);
+}
+
+function buyPhone(name){
+ const phone=phoneCatalog.find(p=>p.name===name);
+ if(wallet<phone.price){showMessage("Not enough money.");return}
+ wallet-=phone.price;
+ phoneStorage=phone.storage;
+ updateHUD();
+ showPanel("shopping");
+ showMessage("Phone upgraded! Storage: "+phoneStorage+" MB");
+}
+
+function setRent(name){
+ if(rentalCars.includes(name)){
+ rentalCars=rentalCars.filter(c=>c!==name);
+ showMessage("Rental stopped for "+name);
+ }else{
+ if(name===currentCar&&driving){
+ showMessage("Exit this car before renting it.");
+ return;
+ }
+ rentalCars.push(name);
+ showMessage(name+" is now available for rental.");
+ }
+ showPanel("rental");
+}
+
+function setRentRate(name){
+ const current=carRentRate[name]||carCatalog.find(c=>c.name===name).rent;
+ const rate=Number(prompt("Set daily rent in virtual rupees:",current));
+ if(rate>0){
+ carRentRate[name]=rate;
+ showPanel("rental");
+ }
+}
+
+function collectRent(){
+ let earned=0;
+ rentalCars.forEach(name=>{
+ earned+=carRentRate[name]||carCatalog.find(c=>c.name===name).rent;
+ });
+ if(earned===0){showMessage("No cars currently rented.");return}
+ wallet+=earned;
+ carRentIncome+=earned;
+ rentalCars=[];
+ updateHUD();
+ showPanel("rental");
+ showMessage("Daily rental income collected: ₹"+earned);
+}
+
+function collectTaxiIncome(){
+ const amount=ownedCars.length*500;
+ wallet+=amount;
+ carRentIncome+=amount;
+ updateHUD();
+ showPanel("taxibiz");
+ showMessage("Taxi business income: ₹"+amount);
+}
+
+function orderFood(food,price){
+ if(wallet<price){showMessage("Not enough money.");return}
+ wallet-=price;
+ updateHUD();
+ showMessage("Food ordered. NPC rider is on the way!");
+ setTimeout(()=>{
+ deliveryStorage.push(food);
+ showMessage(food+" delivered to your home storage.");
+ if(currentPanel==="food")showPanel("food");
+ },8000);
+}
+
+function collectFood(index){
+ const food=deliveryStorage[index];
+ deliveryStorage.splice(index,1);
+ inventory.push(food);
+ showPanel("food");
+ showMessage(food+" collected into inventory.");
+}
+
+function bookTaxi(){
+ if(wallet<200){showMessage("Not enough money for taxi.");return}
+ wallet-=200;
+ updateHUD();
+ showMessage("Taxi booked! NPC driver is arriving.");
+ setTimeout(()=>{
+ showMessage("Taxi arrived. Boarding...");
+ setTimeout(()=>{
+ showMessage("Taxi camera: Inside taxi. Traveling to destination...");
+ setTimeout(()=>{
+ showMessage("You reached destination. Taxi ride completed.");
+ },6000);
+ },3000);
+ },4000);
+}
+
+function workJob(job,salary){
+ showMessage("Working as "+job+"...");
+ setTimeout(()=>{
+ wallet+=salary;updateHUD();
+ showMessage("Job completed! Earned ₹"+salary);
+ },6000);
+}
+
+function refuel(){
+ if(wallet<300){showMessage("Not enough money.");return}
+ wallet-=300;fuel=100;updateHUD();showPanel("garage");
+ showMessage("Fuel tank filled.");
+}
+
+function repairCar(){
+ if(wallet<500){showMessage("Not enough money.");return}
+ wallet-=500;updateHUD();showPanel("garage");
+ showMessage("Car repaired.");
+}
+
+function paintCar(){
+ showMessage("Car paint customization coming into your garage.");
+}
+
+function navigate(place){
+ showMessage("GPS navigation started to "+place);
+ closePanel();
+}
+
+function setGraphics(value){
+ showMessage("Graphics set to "+value);
+}
+
+function playMusic(){
+ const url=document.getElementById("audioURL").value;
+ const player=document.getElementById("audioPlayer");
+ player.src=url;
+ player.play().catch(()=>showMessage("Use a direct audio file URL."));
+}
+</script>
+</body>
+</html>
