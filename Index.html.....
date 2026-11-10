@@ -1,0 +1,967 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Indian Roblox Life Simulator - Prototype 5</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111827;font-family:Arial;color:white;touch-action:none}
+#game{position:fixed;inset:0}
+canvas{display:block}
+button,input,select{font:inherit}
+button{border:0;border-radius:10px;padding:10px 13px;background:#263b58;color:white;font-weight:bold}
+button:active{transform:scale(.96);background:#087cba}
+#hud{position:fixed;inset:0;pointer-events:none}
+.panel{background:#101b2ddd;border:1px solid #52708c;border-radius:12px;padding:9px;box-shadow:0 3px 15px #0007}
+#top{position:absolute;top:8px;left:8px;right:8px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+#stats{font-size:12px;line-height:1.6}
+#miniWrap{pointer-events:auto;width:122px;height:122px;position:relative}
+#mini{width:122px;height:122px;border-radius:12px;background:#15283a}
+#miniLabel{position:absolute;top:3px;left:6px;font-size:10px;text-shadow:0 1px 3px black}
+#location{position:absolute;top:140px;left:8px;font-size:12px}
+#jobStatus{position:absolute;top:174px;left:8px;font-size:12px;max-width:190px}
+#speed{position:absolute;right:12px;bottom:145px;font-size:17px;text-align:right}
+#phoneBtn{pointer-events:auto;position:absolute;right:12px;top:145px;background:#7b35c9;border:1px solid #d5a7ff}
+#interact{pointer-events:auto;position:absolute;right:16px;bottom:80px;background:#0d789f}
+#jump{pointer-events:auto;position:absolute;right:16px;bottom:20px}
+#run{pointer-events:auto;position:absolute;right:90px;bottom:20px}
+#exitBtn{pointer-events:auto;position:absolute;right:90px;bottom:80px;display:none;background:#9a4a24}
+#joystick{pointer-events:auto;position:absolute;left:18px;bottom:25px;width:120px;height:120px;border-radius:50%;background:#b8d6ef22;border:2px solid #b8d6ef77}
+#stick{position:absolute;left:35px;top:35px;width:46px;height:46px;border-radius:50%;background:#d4edff99;border:2px solid white}
+#cameraArea{position:absolute;right:0;bottom:0;width:60%;height:60%;pointer-events:auto}
+#landscape{position:fixed;inset:0;background:#07111f;z-index:99;display:none;align-items:center;justify-content:center;text-align:center;padding:25px}
+#phone,#worldMap,#dialog{position:fixed;z-index:20;inset:3%;display:none;background:#111a2c;border:2px solid #9a68d8;border-radius:22px;padding:14px;overflow:auto;box-shadow:0 0 35px #000b}
+#phone{background:linear-gradient(145deg,#26133e,#101d39);border-color:#b57aff}
+#phoneHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+#phoneTitle{font-size:20px;font-weight:bold;color:#e6caff}
+#appGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.appIcon{min-height:82px;background:#ffffff12;border:1px solid #ffffff25;border-radius:15px;text-align:center;padding:10px 3px;color:white}
+.appIcon .emoji{font-size:28px;display:block;margin-bottom:6px}
+.appIcon small{font-size:11px}
+#appPage{margin-top:12px;background:#0a1428;border-radius:14px;padding:12px;min-height:180px}
+#appPage button{margin:4px}
+#appPage input,#appPage select{max-width:100%;padding:9px;border-radius:8px;border:1px solid #66809c;background:#17263d;color:white;margin:4px}
+#worldMap{background:#0a1726;border-color:#50caff}
+#worldCanvas{width:100%;height:70%;background:#172b3c;border-radius:12px;touch-action:none}
+#mapTools{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0}
+#dialog{inset:20% 8%;z-index:30;max-height:60%;border-color:#4ccaff}
+#toast{position:fixed;z-index:50;left:50%;top:45%;transform:translate(-50%,-50%);background:#101b2e;border:1px solid #66cfff;border-radius:12px;padding:12px 18px;display:none;pointer-events:none;text-align:center}
+#phoneClose,#mapClose{background:#943e55}
+#help{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:12px;color:#ffffffaa;text-align:center;pointer-events:none}
+@media(orientation:portrait){
+#landscape{display:flex}
+}
+</style>
+</head>
+<body>
+<div id="game"></div>
+
+<div id="hud">
+ <div id="top">
+  <div class="panel" id="stats">
+   <b>INDIAN LIFE SIMULATOR</b><br>
+   Cash: ₹<span id="cash">2500</span><br>
+   Bank: ₹<span id="bank">5000</span><br>
+   <span id="health">Health: 100</span>
+  </div>
+  <div id="miniWrap" class="panel">
+   <span id="miniLabel">MINI MAP · 20m</span>
+   <canvas id="mini" width="244" height="244"></canvas>
+  </div>
+ </div>
+ <div id="location" class="panel">Location: Home</div>
+ <div id="jobStatus" class="panel">Job: None</div>
+ <button id="phoneBtn">📱 PHONE</button>
+ <div id="speed" class="panel">0 km/h</div>
+ <button id="interact">ENTER / ACTION</button>
+ <button id="exitBtn">EXIT</button>
+ <button id="run">RUN</button>
+ <button id="jump">JUMP</button>
+ <div id="joystick"><div id="stick"></div></div>
+ <div id="cameraArea"></div>
+</div>
+
+<div id="phone">
+ <div id="phoneHead">
+  <div><div id="phoneTitle">📱 My Phone</div><small id="phoneClock">Indian Life OS</small></div>
+  <button id="phoneClose">✕ CLOSE</button>
+ </div>
+ <div id="appGrid"></div>
+ <div id="appPage">Welcome! Select an app.</div>
+</div>
+
+<div id="worldMap">
+ <div style="display:flex;justify-content:space-between;align-items:center">
+  <b>🗺️ WORLD MAP & GPS</b><button id="mapClose">CLOSE</button>
+ </div>
+ <div id="mapTools">
+  <button id="zoomIn">＋ Zoom</button>
+  <button id="zoomOut">－ Zoom</button>
+  <button id="mapCenter">My Location</button>
+  <span id="selectedPlace">Destination: None</span>
+ </div>
+ <canvas id="worldCanvas" width="900" height="550"></canvas>
+ <button id="setDestination">SET GPS DESTINATION</button>
+</div>
+
+<div id="dialog">
+ <div id="dialogContent"></div>
+ <button onclick="closeDialog()">CLOSE</button>
+</div>
+<div id="toast"></div>
+<div id="landscape">📱<br><br>Please rotate your phone to Landscape Mode<br><br>गेम खेलने के लिए फोन Horizontal करें।</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+<script>
+"use strict";
+
+/* =========================
+   1. GAME DATA
+========================= */
+const $=id=>document.getElementById(id);
+const places=[
+ ["Home",-20,10],["School",85,85],["Bank",-90,40],
+ ["Hospital",95,-65],["Shopping Mall",10,-100],
+ ["Petrol Pump",-110,-70],["Garage",0,105],
+ ["Office",100,0],["Restaurant",-65,-105],
+ ["Bus Station",130,80],["Taxi Stand",-135,95],
+ ["Park",20,65],["Home Stop",-30,20],
+ ["Market Stop",15,-80],["Park Stop",30,70]
+];
+const appList=[
+ ["App Store","🛍️","store"],["Play Store","▶️","play"],
+ ["Bank","🏦","bank"],["Shopping","🛒","shop"],
+ ["Map / GPS","🗺️","map"],["Taxi","🚕","taxi"],
+ ["Jobs","💼","jobs"],["Garage","🔧","garage"],
+ ["Restaurant","🍔","food"],["Car Rental","🚘","rental"],
+ ["Inventory","🎒","inventory"]
+];
+let installed=new Set(["store","play","map","jobs"]);
+let cash=2500,bank=5000,health=100;
+let inventory={Water:2,Food:1};
+let selectedDestination=null;
+let currentJob=null;
+let busStops=[],busStopIndex=0,busPassengers=0;
+let activeVehicle=null,vehicles=[],npcs=[],foodOrders=[];
+let taxi=null,taxiPhase="",rentalCars=0;
+let playerYaw=0,camYaw=0,camPitch=.32,camDistance=9;
+let moving=false,running=false,jumpTime=0;
+let joy={x:0,y:0},keys={};
+let mapZoom=1,mapCenter={x:0,z:0};
+let lastTime=0,phoneOpen=false,driving=false;
+let renderer,scene,camera,player,playerRig,routeLine;
+let carShopPrice=6500;
+let gameReady=false;
+
+/* =========================
+   2. THREE.JS WORLD
+========================= */
+const container=$("game");
+scene=new THREE.Scene();
+scene.background=new THREE.Color(0x8cc7ed);
+scene.fog=new THREE.Fog(0x8cc7ed,180,520);
+camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,900);
+renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:"high-performance"});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
+renderer.shadowMap.enabled=false;
+container.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xffffff,0x61735d,2));
+const sun=new THREE.DirectionalLight(0xffffff,2);
+sun.position.set(-100,180,100);
+scene.add(sun);
+
+const mat=(color,rough=.85)=>new THREE.MeshStandardMaterial({color,roughness:rough});
+const materials={
+ grass:mat(0x6d9e58),road:mat(0x303943),line:mat(0xe9e4c6),
+ skin:mat(0xffc18d),shirt:mat(0x2479d5),pants:mat(0x293a67),
+ hair:mat(0x252020),glass:mat(0x78b8d0,.3),
+ building:mat(0xd3b98e),white:mat(0xf0eee5),
+ red:mat(0xd74c40),blue:mat(0x287fc0),yellow:mat(0xf0bd34)
+};
+
+function box(w,h,d,material,x,y,z,parent=scene){
+ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);
+ m.position.set(x,y,z);parent.add(m);return m;
+}
+function ground(){
+ box(700,.2,700,materials.grass,0,-.15,0);
+ for(let i=-300;i<=300;i+=50){
+  box(12,.04,700,materials.road,i,.01,0);
+  box(700,.04,12,materials.road,0,.02,i);
+  for(let j=-300;j<300;j+=25){
+   box(0.5,.05,7,materials.line,i,.05,j);
+   box(7,.05,.5,materials.line,j,.05,i);
+  }
+ }
+}
+ground();
+
+function makeBuilding(name,x,z,color=0xd3b98e,w=22,h=13,d=18){
+ const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);
+ box(w,h,d,mat(color),0,h/2,0,g);
+ box(w+1,1,d+1,mat(0x4c5360),0,h,0,g);
+ // Front windows
+ for(let xx=-w/2+3;xx<w/2-1;xx+=5){
+  box(2.2,3,.15,materials.glass,xx,h*.65,d/2+.09,g);
+ }
+ box(4,5,.25,mat(0x63452f),0,2.5,d/2+.13,g);
+ const sign=box(Math.min(w-2,15),1.5,.3,mat(color===0xd3b98e?0x244c77:0x264a60),0,h+1,d/2+.2,g);
+ sign.userData.label=name;
+ return g;
+}
+const buildings=[];
+const buildingData=[
+ ["HOME",-20,10,0xd8b58b],["SCHOOL",85,85,0xe3c66d],
+ ["BANK",-90,40,0x8cacc9],["HOSPITAL",95,-65,0xf0eeee],
+ ["MALL",10,-100,0xb6a0d5],["PETROL",-110,-70,0x6da9b8],
+ ["GARAGE",0,105,0x8a9ba6],["OFFICE",100,0,0x9cabc1],
+ ["DHABA",-65,-105,0xc68a52],["BUS STATION",130,80,0x8db2a0],
+ ["TAXI STAND",-135,95,0xe6ce63],["PARK",20,65,0x6ca16a]
+];
+for(const b of buildingData){
+ const g=makeBuilding(...b);
+ buildings.push({x:b[1],z:b[2],w:22,d:18,name:b[0],group:g});
+}
+// Open front garage: add roof and side supports, no front door
+const garage=buildings.find(b=>b.name==="GARAGE");
+if(garage){
+ garage.group.children[0].visible=false;
+ box(26,1,23,mat(0x697b8a),0,12,0,garage.group);
+ box(1,12,1,mat(0x596a78),-12,6,0,garage.group);
+ box(1,12,1,mat(0x596a78),12,6,0,garage.group);
+}
+function makeTree(x,z){
+ const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);
+ box(.8,5,.8,mat(0x74502d),0,2.5,0,g);
+ const crown=new THREE.Mesh(new THREE.SphereGeometry(3,7,6),mat(0x2c7d48));
+ crown.position.y=6;g.add(crown);
+}
+for(let i=0;i<65;i++){
+ let x=(Math.random()-.5)*520,z=(Math.random()-.5)*520;
+ if(Math.abs(x%50)<13||Math.abs(z%50)<13)continue;
+ makeTree(x,z);
+}
+
+/* =========================
+   3. ROBLOX PLAYER
+========================= */
+function limb(w,h,d,material,x,y,z,parent){
+ return box(w,h,d,material,x,y,z,parent);
+}
+function makeCharacter(shirt=materials.shirt){
+ const root=new THREE.Group();
+ const torso=limb(1.2,1.5,.65,shirt,0,2.25,0,root);
+ const head=limb(.85,.85,.85,materials.skin,0,3.45,0,root);
+ limb(.9,.25,.9,materials.hair,0,3.91,0,root);
+ // Face points toward local -Z
+ limb(.12,.12,.04,mat(0x202020),-.2,3.5,-.44,root);
+ limb(.12,.12,.04,mat(0x202020),.2,3.5,-.44,root);
+ limb(.3,.06,.04,mat(0x8b3030),0,3.25,-.45,root);
+ const leftArm=limb(.35,1.3,.4,materials.skin,-.85,2.25,0,root);
+ const rightArm=limb(.35,1.3,.4,materials.skin,.85,2.25,0,root);
+ const leftLeg=limb(.45,1.25,.5,materials.pants,-.32,.65,0,root);
+ const rightLeg=limb(.45,1.25,.5,materials.pants,.32,.65,0,root);
+ root.userData={leftArm,rightArm,leftLeg,rightLeg,head,torso};
+ scene.add(root);return root;
+}
+player=makeCharacter();
+player.position.set(-20,0,18);
+playerRig=player;
+
+function animateRig(root,t,walk,speed=1){
+ if(!root||!root.userData.leftArm)return;
+ const a=Math.sin(t*9)*.55*walk*speed;
+ root.userData.leftArm.rotation.x=a;
+ root.userData.rightArm.rotation.x=-a;
+ root.userData.leftLeg.rotation.x=-a;
+ root.userData.rightLeg.rotation.x=a;
+}
+function playerPosition(){return activeVehicle?activeVehicle.root.position:player.position}
+function nearestPlace(){
+ const p=playerPosition();let best=null,dist=1e9;
+ for(const a of places){
+  const d=Math.hypot(p.x-a[1],p.z-a[2]);
+  if(d<dist){dist=d;best=a}
+ }
+ return {place:best,distance:dist};
+}
+
+/* =========================
+   4. VEHICLES
+========================= */
+function makeVehicle(type,x,z,color=0x287fc0){
+ const root=new THREE.Group();root.position.set(x,0,z);scene.add(root);
+ const body=box(type==="bus"?3.6:2.2,type==="bus"?1.5:.8,type==="bus"?7:4,mat(color),0,1.1,0,root);
+ box(type==="bus"?3.3:1.9,type==="bus"?1.1:.9,type==="bus"?3.5:2,materials.glass,0,2,0,root);
+ const wheels=[];
+ for(const xx of [-1.2,1.2])for(const zz of type==="bus"?[-2.5,2.5]:[-1.3,1.3]){
+  const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.42,.42,.25,10),mat(0x17191c));
+  wheel.rotation.z=Math.PI/2;wheel.position.set(xx,.5,zz);root.add(wheel);wheels.push(wheel);
+ }
+ const v={root,type,wheels,speed:0,yaw:0,color,health:100};
+ vehicles.push(v);return v;
+}
+const starterCar=makeVehicle("car",-12,22,0x176dc4);
+function enterVehicle(v){
+ if(!v)return;
+ activeVehicle=v;driving=true;
+ player.visible=false;
+ $("exitBtn").style.display="block";
+ toast("Entered "+v.type.toUpperCase());
+}
+function exitVehicle(){
+ if(!activeVehicle)return;
+ const p=activeVehicle.root.position;
+ player.position.set(p.x+3,0,p.z+2);
+ player.visible=true;activeVehicle=null;driving=false;
+ $("exitBtn").style.display="none";
+}
+$("exitBtn").onclick=exitVehicle;
+function updateVehicle(v,dt){
+ if(v===activeVehicle){
+  const throttle=(keys.w?1:0)-(keys.s?1:0)-joy.y;
+  const steer=(keys.d?1:0)-(keys.a?1:0)+joy.x;
+  v.speed+=(throttle*23-v.speed*1.4)*dt;
+  v.speed=THREE.MathUtils.clamp(v.speed,-12,25);
+  v.yaw+=steer*dt*(.9+Math.abs(v.speed)*.04);
+  v.root.rotation.y=v.yaw;
+  v.root.position.x-=Math.sin(v.yaw)*v.speed*dt;
+  v.root.position.z-=Math.cos(v.yaw)*v.speed*dt;
+  if(Math.abs(v.speed)<.2)v.speed=0;
+ }else v.speed*=.98;
+ v.wheels.forEach(w=>w.rotation.x+=v.speed*dt*1.5);
+}
+function nearestVehicle(){
+ const p=playerPosition();let best=null,distance=8;
+ for(const v of vehicles){
+  const d=p.distanceTo(v.root.position);
+  if(d<distance){best=v;distance=d}
+ }
+ return best;
+}
+
+/* =========================
+   5. NPCs
+========================= */
+function spawnNPC(x,z){
+ const n=makeCharacter(mat([0x36a6a2,0xb76b9c,0xdaa94e,0x6b8bd4][Math.floor(Math.random()*4)]));
+ n.position.set(x,0,z);
+ n.userData.target=new THREE.Vector3(x+(Math.random()-.5)*30,0,z+(Math.random()-.5)*30);
+ npcs.push(n);
+}
+for(let i=0;i<14;i++)spawnNPC((Math.random()-.5)*180,(Math.random()-.5)*180);
+function updateNPCs(dt,t){
+ for(const n of npcs){
+  const target=n.userData.target;
+  const dx=target.x-n.position.x,dz=target.z-n.position.z;
+  const d=Math.hypot(dx,dz);
+  if(d<2)n.userData.target.set(n.position.x+(Math.random()-.5)*35,0,n.position.z+(Math.random()-.5)*35);
+  else{
+   n.position.x+=dx/d*dt*2;
+   n.position.z+=dz/d*dt*2;
+   n.rotation.y=Math.atan2(-dx,-dz);
+  }
+  animateRig(n,t,1,.5);
+ }
+}
+
+/* =========================
+   6. GPS ROUTE
+========================= */
+function clearRoute(){
+ if(routeLine){scene.remove(routeLine);routeLine.geometry.dispose();routeLine=null}
+}
+function setGPS(place){
+ selectedDestination=place;
+ clearRoute();
+ if(!place){toast("GPS cleared");return}
+ const p=playerPosition();
+ const points=[new THREE.Vector3(p.x,.35,p.z),new THREE.Vector3(place[1],.35,place[2])];
+ routeLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),
+  new THREE.LineBasicMaterial({color:0x00eaff}));
+ scene.add(routeLine);
+ toast("GPS set: "+place[0]);
+ $("selectedPlace").textContent="Destination: "+place[0];
+}
+function routeWaypoints(a,b){
+ // Simple grid-road route approximation
+ const pts=[new THREE.Vector3(a.x,.4,a.z)];
+ const midX=Math.round(b.x/50)*50;
+ pts.push(new THREE.Vector3(midX,.4,a.z));
+ pts.push(new THREE.Vector3(midX,.4,b.z));
+ pts.push(new THREE.Vector3(b.x,.4,b.z));
+ return pts;
+}
+
+/* =========================
+   7. PHONE SYSTEM
+========================= */
+function openPhone(){
+ phoneOpen=true;$("phone").style.display="block";
+ renderPhone();$("appPage").innerHTML="Choose an app from your phone.";
+}
+function closePhone(){phoneOpen=false;$("phone").style.display="none"}
+$("phoneBtn").onclick=openPhone;
+$("phoneClose").onclick=closePhone;
+
+function renderPhone(){
+ const grid=$("appGrid");grid.innerHTML="";
+ for(const a of appList){
+  const installedApp=installed.has(a[2]);
+  const div=document.createElement("button");
+  div.className="appIcon";
+  div.innerHTML='<span class="emoji">'+a[1]+'</span><small>'+a[0]+'</small><br><small>'+(installedApp?"OPEN":"INSTALL")+'</small>';
+  div.onclick=()=>openApp(a[2]);
+  grid.appendChild(div);
+ }
+}
+function appButton(label,fn){
+ const b=document.createElement("button");b.textContent=label;b.onclick=fn;return b;
+}
+function appPage(title,html){
+ $("appPage").innerHTML="<h3>"+title+"</h3>"+html;
+}
+function openApp(id){
+ if(!installed.has(id)&&id!=="store"&&id!=="play"){
+  appPage("Install App",'<p>This app is not installed.</p>');
+  $("appPage").appendChild(appButton("INSTALL",()=>{installed.add(id);save();renderPhone();openApp(id);toast("App installed")}));
+  return;
+ }
+ switch(id){
+  case "store":case "play":showStore(id);break;
+  case "bank":showBank();break;
+  case "shop":showShopping();break;
+  case "map":closePhone();openWorldMap();break;
+  case "taxi":showTaxi();break;
+  case "jobs":showJobs();break;
+  case "garage":showGarage();break;
+  case "food":showRestaurant();break;
+  case "rental":showRental();break;
+  case "inventory":showInventory();break;
+ }
+}
+function showStore(id){
+ let html="<p>Download in-game apps. These are game apps, not real phone installations.</p>";
+ for(const a of appList){
+  if(["store","play"].includes(a[2]))continue;
+  html+='<p>'+a[1]+' <b>'+a[0]+'</b> — '+(installed.has(a[2])?"Installed":'<button onclick="installApp(\\''+a[2]+'\\')">Install</button>')+'</p>';
+ }
+ appPage(id==="store"?"App Store":"Play Store",html);
+}
+function installApp(id){
+ installed.add(id);save();renderPhone();toast("App installed successfully");
+ showStore("store");
+}
+
+/* =========================
+   8. BANK AND SHOPPING
+========================= */
+function showBank(){
+ appPage("🏦 Bank",
+ '<p>Cash Wallet: ₹'+cash+'</p><p>Bank Balance: ₹'+bank+'</p>'+
+ '<input id="bankAmount" type="number" min="1" placeholder="Amount">'+
+ '<button onclick="bankAction(\\'deposit\\')">Deposit</button>'+
+ '<button onclick="bankAction(\\'withdraw\\')">Withdraw</button>'+
+ '<p id="bankMessage">Secure in-game bank account.</p>');
+}
+function bankAction(type){
+ const amount=Math.floor(Number($("bankAmount").value));
+ if(!amount||amount<1){toast("Enter valid amount");return}
+ if(type==="deposit"&&cash>=amount){cash-=amount;bank+=amount}
+ else if(type==="withdraw"&&bank>=amount){bank-=amount;cash+=amount}
+ else{toast("Insufficient balance");return}
+ save();updateHUD();showBank();toast("Transaction completed");
+}
+const shopItems=[
+ ["Water",50],["Food",100],["Med Kit",250],["Phone Cover",150],
+ ["School Bag",300],["Sports Shoes",500]
+];
+function showShopping(){
+ let html="<p>Available Items</p>";
+ shopItems.forEach((it,i)=>html+='<p>'+it[0]+' — ₹'+it[1]+' <button onclick="buyItem('+i+')">BUY</button></p>');
+ appPage("🛒 Shopping",html);
+}
+function buyItem(i){
+ const it=shopItems[i];
+ if(cash<it[1])return toast("Not enough cash");
+ cash-=it[1];inventory[it[0]]=(inventory[it[0]]||0)+1;
+ save();updateHUD();showShopping();toast(it[0]+" purchased");
+}
+
+/* =========================
+   9. TAXI SYSTEM
+========================= */
+function showTaxi(){
+ let html='<p>Choose your destination:</p><select id="taxiDest">';
+ places.forEach((p,i)=>html+='<option value="'+i+'">'+p[0]+'</option>');
+ html+='</select><p>Taxi fare: ₹150 base + distance</p><button onclick="bookTaxi()">BOOK TAXI</button>';
+ appPage("🚕 Taxi Booking",html);
+}
+function bookTaxi(){
+ if(taxi)return toast("A taxi booking is already active");
+ const place=places[Number($("taxiDest").value)];
+ if(!place)return;
+ const p=playerPosition();
+ const fare=Math.ceil(150+Math.hypot(place[1]-p.x,place[2]-p.z)*2);
+ if(cash<fare)return toast("Not enough cash for taxi");
+ taxi=makeVehicle("taxi",p.x+25,p.z+25,0xf1c63c);
+ taxi.target={x:p.x,z:p.z};taxi.destination=place;taxi.fare=fare;
+ taxiPhase="coming";toast("Taxi booked! It is coming.");
+ $("appPage").innerHTML="<h3>Taxi Booked</h3><p>Taxi is coming to your location.</p><button onclick='enterTaxi()'>ENTER TAXI (when arrived)</button>";
+}
+function updateTaxi(dt){
+ if(!taxi)return;
+ if(taxiPhase==="coming"){
+  const p=playerPosition();
+  moveToward(taxi,p.x+3,p.z+3,dt,12);
+  if(Math.hypot(taxi.root.position.x-p.x,taxi.root.position.z-p.z)<5){
+   taxiPhase="arrived";toast("Taxi arrived. Press ENTER TAXI.");
+  }
+ }
+ if(taxiPhase==="riding"){
+  const d=taxi.destination;
+  moveToward(taxi,d[1],d[2],dt,16);
+  if(Math.hypot(taxi.root.position.x-d[1],taxi.root.position.z-d[2])<3){
+   cash-=taxi.fare;taxi.root.position.set(d[1],0,d[2]);
+   if(activeVehicle===taxi){activeVehicle=null;driving=false;player.visible=true}
+   scene.remove(taxi.root);vehicles=vehicles.filter(v=>v!==taxi);
+   taxi=null;taxiPhase="";$("exitBtn").style.display="none";
+   updateHUD();save();toast("Taxi ride completed!");
+  }
+ }
+}
+function moveToward(v,x,z,dt,speed){
+ const dx=x-v.root.position.x,dz=z-v.root.position.z;
+ const d=Math.hypot(dx,dz);
+ if(d>.5){
+  v.root.position.x+=dx/d*speed*dt;
+  v.root.position.z+=dz/d*speed*dt;
+  v.root.rotation.y=Math.atan2(-dx,-dz);
+  v.wheels.forEach(w=>w.rotation.x+=dt*speed);
+ }
+}
+function enterTaxi(){
+ if(!taxi||taxiPhase!=="arrived")return toast("Taxi has not arrived");
+ enterVehicle(taxi);taxiPhase="riding";toast("Taxi ride started");
+}
+
+/* =========================
+   10. JOB SYSTEM
+========================= */
+function showJobs(){
+ appPage("💼 Jobs",
+ '<p>Choose a job:</p>'+
+ '<button onclick="startBusJob()">🚌 School Bus Driver</button>'+
+ '<button onclick="startTaxiDriver()">🚕 Taxi Driver</button>'+
+ '<button onclick="startDeliveryJob()">🍔 Food Delivery</button>'+
+ '<p>Complete jobs to earn cash.</p>');
+}
+function startBusJob(){
+ if(currentJob)return toast("Finish current job first");
+ const stops=[places[12],places[13],places[14]];
+ const dest=places[1];
+ currentJob={type:"bus",reward:1200,stage:"pickup",destination:dest};
+ busStops=stops;busStopIndex=0;busPassengers=0;
+ const p=playerPosition();
+ const bus=makeVehicle("bus",p.x+5,p.z+8,0xe9c53c);
+ enterVehicle(bus);
+ setGPS(busStops[0]);
+ updateJob();
+ toast("School Bus job started. Follow GPS.");
+}
+function startTaxiDriver(){
+ if(currentJob)return toast("Finish current job first");
+ currentJob={type:"taxiDriver",reward:900,stage:"drive",destination:places[10]};
+ const p=playerPosition();
+ const car=makeVehicle("taxi",p.x+4,p.z+4,0xf1c63c);
+ enterVehicle(car);setGPS(currentJob.destination);updateJob();
+}
+function startDeliveryJob(){
+ if(currentJob)return toast("Finish current job first");
+ currentJob={type:"delivery",reward:500,stage:"drive",destination:places[8]};
+ setGPS(currentJob.destination);updateJob();
+ toast("Food delivery started. Go to the Restaurant.");
+}
+function updateJob(){
+ $("jobStatus").textContent=currentJob?
+ "Job: "+currentJob.type+" | "+currentJob.stage:"Job: None";
+}
+function busStopAction(){
+ if(!currentJob||currentJob.type!=="bus"||!activeVehicle||activeVehicle.type!=="bus")return;
+ if(currentJob.stage==="pickup"){
+  if(busPassengers>=10)return toast("Bus is full");
+  const count=Math.min(3,10-busPassengers);
+  busPassengers+=count;
+  currentJob.stage="pickup";
+  busStopIndex++;
+  if(busStopIndex<busStops.length){
+   setGPS(busStops[busStopIndex]);
+   toast(count+" students boarded. Passengers: "+busPassengers);
+  }else{
+   currentJob.stage="drop";
+   setGPS(currentJob.destination);
+   toast("All pickup stops completed. Go to School.");
+  }
+ }else if(currentJob.stage==="drop"){
+  busPassengers=0;
+  cash+=currentJob.reward;
+  currentJob=null;clearRoute();updateJob();updateHUD();save();
+  toast("School Bus job completed! +₹1200");
+ }
+}
+function completeSimpleJob(){
+ if(!currentJob)return;
+ cash+=currentJob.reward;currentJob=null;clearRoute();
+ updateJob();updateHUD();save();toast("Job completed! Reward added.");
+}
+
+/* =========================
+   11. GARAGE / RENTAL / FOOD
+========================= */
+function showGarage(){
+ appPage("🔧 Garage",
+ '<p>Vehicle Health: '+(activeVehicle?activeVehicle.health:starterCar.health)+'%</p>'+
+ '<button onclick="repairVehicle()">Repair Vehicle — ₹300</button>'+
+ '<button onclick="buyCar()">Buy New Car — ₹6500</button>'+
+ '<p>Drive near the open Garage to use the service.</p>');
+}
+function repairVehicle(){
+ const v=activeVehicle||nearestVehicle()||starterCar;
+ if(cash<300)return toast("Not enough cash");
+ cash-=300;v.health=100;save();updateHUD();showGarage();toast("Vehicle repaired");
+}
+function buyCar(){
+ if(cash<carShopPrice)return toast("Need ₹6500 to buy a car");
+ cash-=carShopPrice;
+ const p=playerPosition();
+ const v=makeVehicle("car",p.x+6,p.z+5,0x9b48d1);
+ vehicles.push(v);save();updateHUD();showGarage();toast("New car purchased!");
+}
+function showRental(){
+ appPage("🚘 Car Rental",
+ '<p>Your listed cars: '+rentalCars+'</p>'+
+ '<p>Rental earning: ₹200 per collection</p>'+
+ '<button onclick="listRental()">LIST NEARBY CAR</button>'+
+ '<button onclick="collectRent()">COLLECT RENT</button>');
+}
+function listRental(){
+ if(!nearestVehicle())return toast("Bring a car near you first");
+ rentalCars++;save();showRental();toast("Car listed for rental");
+}
+function collectRent(){
+ if(rentalCars<1)return toast("No car listed");
+ const amount=rentalCars*200;
+ cash+=amount;save();updateHUD();showRental();toast("Rental income +₹"+amount);
+}
+function showRestaurant(){
+ appPage("🍔 Restaurant / Dhaba",
+ '<p>Fresh food menu</p>'+
+ '<p>Meal Plate — ₹120 <button onclick="orderFood(120)">ORDER</button></p>'+
+ '<p>Snack Box — ₹70 <button onclick="orderFood(70)">ORDER</button></p>'+
+ '<p>Juice — ₹40 <button onclick="orderFood(40)">ORDER</button></p>');
+}
+function orderFood(price){
+ if(cash<price)return toast("Not enough cash");
+ cash-=price;updateHUD();
+ toast("Order placed. Preparing your food...");
+ setTimeout(()=>{
+  inventory["Food"]=(inventory["Food"]||0)+1;
+  save();toast("Food delivered to your inventory");
+ },5000);
+}
+
+/* =========================
+   12. INVENTORY
+========================= */
+function showInventory(){
+ let html="<p>Your Items</p>";
+ for(const [name,count] of Object.entries(inventory))
+  html+="<p>"+name+": <b>"+count+"</b></p>";
+ html+="<p>Vehicles owned: "+vehicles.length+"</p>";
+ appPage("🎒 Inventory",html);
+}
+
+/* =========================
+   13. WORLD MAP
+========================= */
+const worldCanvas=$("worldCanvas"),wctx=worldCanvas.getContext("2d");
+function drawWorldMap(){
+ const w=worldCanvas.width,h=worldCanvas.height;
+ wctx.clearRect(0,0,w,h);wctx.fillStyle="#172b3c";wctx.fillRect(0,0,w,h);
+ const scale=mapZoom*1.3;
+ const sx=x=>w/2+(x-mapCenter.x)*scale;
+ const sy=z=>h/2+(z-mapCenter.z)*scale;
+ wctx.strokeStyle="#687b87";wctx.lineWidth=8*scale/1.3;
+ for(let i=-300;i<=300;i+=50){
+  wctx.beginPath();wctx.moveTo(sx(i),0);wctx.lineTo(sx(i),h);wctx.stroke();
+  wctx.beginPath();wctx.moveTo(0,sy(i));wctx.lineTo(w,sy(i));wctx.stroke();
+ }
+ for(const p of places){
+  const x=sx(p[1]),y=sy(p[2]);
+  if(x<0||x>w||y<0||y>h)continue;
+  wctx.fillStyle="#f0cb57";wctx.beginPath();wctx.arc(x,y,6,0,7);wctx.fill();
+  wctx.fillStyle="white";wctx.font="14px Arial";wctx.fillText(p[0],x+8,y-8);
+ }
+ const pos=playerPosition();
+ wctx.save();wctx.translate(sx(pos.x),sy(pos.z));wctx.rotate(playerYaw);
+ wctx.fillStyle="#28dfff";wctx.beginPath();
+ wctx.moveTo(0,-12);wctx.lineTo(-8,9);wctx.lineTo(8,9);wctx.closePath();wctx.fill();
+ wctx.restore();
+ if(selectedDestination){
+  wctx.strokeStyle="#00eaff";wctx.lineWidth=3;
+  wctx.beginPath();wctx.moveTo(sx(pos.x),sy(pos.z));
+  wctx.lineTo(sx(selectedDestination[1]),sy(selectedDestination[2]));wctx.stroke();
+ }
+}
+function openWorldMap(){
+ $("worldMap").style.display="block";
+ mapCenter={x:playerPosition().x,z:playerPosition().z};
+ drawWorldMap();
+}
+$("mapClose").onclick=()=>$("worldMap").style.display="none";
+$("zoomIn").onclick=()=>{mapZoom=Math.min(4,mapZoom*1.25);drawWorldMap()};
+$("zoomOut").onclick=()=>{mapZoom=Math.max(.4,mapZoom/1.25);drawWorldMap()};
+$("mapCenter").onclick=()=>{mapCenter={x:playerPosition().x,z:playerPosition().z};drawWorldMap()};
+worldCanvas.addEventListener("click",e=>{
+ const r=worldCanvas.getBoundingClientRect();
+ const x=(e.clientX-r.left-r.width/2)/r.width*worldCanvas.width;
+ const y=(e.clientY-r.top-r.height/2)/r.height*worldCanvas.height;
+ const wx=x/(mapZoom*1.3)+mapCenter.x;
+ const wz=y/(mapZoom*1.3)+mapCenter.z;
+ let best=null,dist=1e9;
+ for(const p of places){
+  const d=Math.hypot(p[1]-wx,p[2]-wz);
+  if(d<dist){best=p;dist=d}
+ }
+ if(best&&dist<25){
+  selectedDestination=best;
+  $("selectedPlace").textContent="Destination: "+best[0];
+  drawWorldMap();toast("Selected "+best[0]);
+ }
+});
+$("setDestination").onclick=()=>{
+ if(!selectedDestination)return toast("Select a location first");
+ setGPS(selectedDestination);$("worldMap").style.display="none";
+};
+
+/* =========================
+   14. MINI MAP WITH DIRECTION TRIANGLE
+========================= */
+function drawMini(){
+ const c=$("mini"),ctx=c.getContext("2d"),s=c.width;
+ ctx.clearRect(0,0,s,s);ctx.fillStyle="#182b3b";ctx.fillRect(0,0,s,s);
+ // 20 metres in all four directions
+ const range=20,scale=s/(range*2);
+ const p=playerPosition();
+ const X=x=>s/2+(x-p.x)*scale;
+ const Y=z=>s/2+(z-p.z)*scale;
+ ctx.strokeStyle="#667783";ctx.lineWidth=5;
+ for(let i=-300;i<=300;i+=50){
+  ctx.beginPath();ctx.moveTo(X(i),0);ctx.lineTo(X(i),s);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,Y(i));ctx.lineTo(s,Y(i));ctx.stroke();
+ }
+ for(const place of places){
+  const x=X(place[1]),y=Y(place[2]);
+  if(x<0||x>s||y<0||y>s)continue;
+  ctx.fillStyle="#e8c34b";ctx.fillRect(x-3,y-3,6,6);
+ }
+ // GPS line
+ if(selectedDestination){
+  ctx.strokeStyle="#00eaff";ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(s/2,s/2);
+  ctx.lineTo(X(selectedDestination[1]),Y(selectedDestination[2]));ctx.stroke();
+ }
+ // Direction triangle: pointed end is player's face direction
+ ctx.save();ctx.translate(s/2,s/2);ctx.rotate(playerYaw);
+ ctx.fillStyle="#31e7ff";ctx.strokeStyle="white";ctx.lineWidth=2;
+ ctx.beginPath();ctx.moveTo(0,-13);ctx.lineTo(-9,10);ctx.lineTo(9,10);
+ ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();
+}
+$("mini").addEventListener("click",openWorldMap);
+
+/* =========================
+   15. INTERACTION
+========================= */
+function interact(){
+ if(driving){
+  if(activeVehicle&&activeVehicle.type==="bus")busStopAction();
+  else if(currentJob&&currentJob.type==="taxiDriver")completeSimpleJob();
+  return;
+ }
+ const near=nearestVehicle();
+ if(near){enterVehicle(near);return}
+ const n=nearestPlace();
+ if(n.distance<18){
+  const name=n.place[0];
+  if(name==="Garage")openPhoneWithApp("garage");
+  else if(name==="Bank")openPhoneWithApp("bank");
+  else if(name==="Restaurant")openPhoneWithApp("food");
+  else if(name==="School"&&currentJob?.type==="bus")busStopAction();
+  else toast("You are near "+name);
+ }else toast("No vehicle or location nearby");
+}
+function openPhoneWithApp(id){openPhone();openApp(id)}
+$("interact").onclick=interact;
+$("jump").onclick=()=>{if(!driving&&jumpTime<=0)jumpTime=.55};
+$("run").onpointerdown=()=>running=true;
+$("run").onpointerup=()=>running=false;
+$("run").onpointerleave=()=>running=false;
+
+/* =========================
+   16. JOYSTICK / CAMERA
+========================= */
+const joyBase=$("joystick"),stick=$("stick");
+let joyPointer=null;
+joyBase.addEventListener("pointerdown",e=>{
+ joyPointer=e.pointerId;joyBase.setPointerCapture(e.pointerId);moveJoy(e);
+});
+joyBase.addEventListener("pointermove",e=>{if(e.pointerId===joyPointer)moveJoy(e)});
+function moveJoy(e){
+ const r=joyBase.getBoundingClientRect();
+ let dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2);
+ const len=Math.hypot(dx,dy),max=42;
+ if(len>max){dx=dx/len*max;dy=dy/len*max}
+ joy.x=dx/max;joy.y=dy/max;
+ stick.style.left=(35+dx)+"px";stick.style.top=(35+dy)+"px";
+}
+function resetJoy(){
+ joyPointer=null;joy.x=0;joy.y=0;stick.style.left="35px";stick.style.top="35px";
+}
+joyBase.addEventListener("pointerup",resetJoy);
+joyBase.addEventListener("pointercancel",resetJoy);
+let camPointer=null,lastCamX=0,lastCamY=0;
+$("cameraArea").addEventListener("pointerdown",e=>{
+ camPointer=e.pointerId;lastCamX=e.clientX;lastCamY=e.clientY;
+ $("cameraArea").setPointerCapture(e.pointerId);
+});
+$("cameraArea").addEventListener("pointermove",e=>{
+ if(e.pointerId!==camPointer)return;
+ camYaw-=(e.clientX-lastCamX)*.008;
+ camPitch=THREE.MathUtils.clamp(camPitch+(e.clientY-lastCamY)*.006,-.15,1.05);
+ lastCamX=e.clientX;lastCamY=e.clientY;
+});
+$("cameraArea").addEventListener("pointerup",()=>camPointer=null);
+$("cameraArea").addEventListener("pointercancel",()=>camPointer=null);
+addEventListener("keydown",e=>{
+ keys[e.key.toLowerCase()]=true;
+ if(e.key===" "&&!driving)jumpTime=.55;
+});
+addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
+addEventListener("wheel",e=>{
+ camDistance=THREE.MathUtils.clamp(camDistance+e.deltaY*.01,4,18);
+},{passive:true});
+
+/* =========================
+   17. PLAYER UPDATE / CAMERA
+========================= */
+function updatePlayer(dt,t){
+ if(driving||phoneOpen||$("worldMap").style.display==="block")return;
+ const forward=-(keys.w?1:0)-(joy.y);
+ const side=(keys.d?1:0)-(keys.a?1:0)+joy.x;
+ const f=THREE.MathUtils.clamp(forward,-1,1);
+ const s=THREE.MathUtils.clamp(side,-1,1);
+ const speed=running?9:5;
+ const dx=(-Math.sin(camYaw)*f+Math.cos(camYaw)*s)*speed*dt;
+ const dz=(-Math.cos(camYaw)*f-Math.sin(camYaw)*s)*speed*dt;
+ player.position.x+=dx;player.position.z+=dz;
+ moving=Math.abs(f)+Math.abs(s)>.1;
+ if(moving){
+  playerYaw=Math.atan2(-dx,-dz);
+  player.rotation.y=playerYaw;
+ }
+ if(jumpTime>0){
+  jumpTime-=dt;
+  player.position.y=Math.sin((.55-jumpTime)/.55*Math.PI)*1.8;
+ }else player.position.y=0;
+ animateRig(player,t,moving?1:0,running?1.5:1);
+}
+function updateCamera(){
+ const target=playerPosition().clone();
+ target.y+=driving?2.1:2.6;
+ const distance=driving?camDistance+2:camDistance;
+ const x=target.x+Math.sin(camYaw)*Math.cos(camPitch)*distance;
+ const y=target.y+Math.sin(camPitch)*distance+1.2;
+ const z=target.z+Math.cos(camYaw)*Math.cos(camPitch)*distance;
+ camera.position.set(x,y,z);camera.lookAt(target);
+}
+
+/* =========================
+   18. HUD / SAVE
+========================= */
+function updateHUD(){
+ $("cash").textContent=cash;
+ $("bank").textContent=bank;
+ $("health").textContent="Health: "+health;
+ const n=nearestPlace();
+ $("location").textContent="Location: "+(n.place?n.place[0]:"City");
+ const v=activeVehicle;
+ $("speed").textContent=v?Math.round(Math.abs(v.speed)*3.6)+" km/h":"0 km/h";
+ $("jobStatus").textContent=currentJob?
+ "Job: "+currentJob.type+" | "+currentJob.stage+
+ (currentJob.type==="bus"?" | Passengers: "+busPassengers:""):"Job: None";
+}
+function save(){
+ const data={cash,bank,health,inventory,installed:[...installed],rentalCars};
+ try{localStorage.setItem("indianLifeP5",JSON.stringify(data))}catch(e){}
+}
+function load(){
+ try{
+  const d=JSON.parse(localStorage.getItem("indianLifeP5")||"{}");
+  if(d.cash!==undefined)cash=d.cash;
+  if(d.bank!==undefined)bank=d.bank;
+  if(d.health!==undefined)health=d.health;
+  if(d.inventory)inventory=d.inventory;
+  if(d.installed)installed=new Set(d.installed);
+  if(d.rentalCars!==undefined)rentalCars=d.rentalCars;
+ }catch(e){console.warn("Save data could not be loaded")}
+}
+let toastTimer;
+function toast(message){
+ const t=$("toast");t.textContent=message;t.style.display="block";
+ clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.style.display="none",2200);
+}
+function closeDialog(){$("dialog").style.display="none"}
+
+/* =========================
+   19. MAIN GAME LOOP
+========================= */
+function animate(now){
+ requestAnimationFrame(animate);
+ const dt=Math.min((now-lastTime)/1000||0,.04);lastTime=now;
+ const t=now/1000;
+ updatePlayer(dt,t);
+ for(const v of vehicles)updateVehicle(v,dt);
+ updateTaxi(dt);
+ updateNPCs(dt,t);
+ updateCamera();
+ drawMini();
+ if($("worldMap").style.display==="block")drawWorldMap();
+ updateHUD();
+ renderer.render(scene,camera);
+}
+load();
+updateHUD();
+gameReady=true;
+requestAnimationFrame(animate);
+
+/* =========================
+   20. RESIZE
+========================= */
+addEventListener("resize",()=>{
+ camera.aspect=innerWidth/innerHeight;
+ camera.updateProjectionMatrix();
+ renderer.setSize(innerWidth,innerHeight);
+});
+
+/* =========================
+   21. AUTO SAVE
+========================= */
+setInterval(save,10000);
+addEventListener("beforeunload",save);
+</script>
+</body>
+</html>
