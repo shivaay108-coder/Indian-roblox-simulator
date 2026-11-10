@@ -1,0 +1,1147 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Indian Roblox Life Simulator - Prototype 5</title>
+<style>
+/* =====================================================
+   01. MAIN DESIGN
+===================================================== */
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101a29;color:white;font-family:Arial,sans-serif;touch-action:none}
+button,select,input{font:inherit}
+button{border:1px solid #526b89;border-radius:10px;background:#243c59;color:white;padding:10px 13px;font-weight:bold}
+button:active{background:#087caa;transform:scale(.97)}
+#game{position:fixed;inset:0}
+#hud{position:fixed;inset:0;pointer-events:none}
+.panel{background:#101c2be8;border:1px solid #526e8d;border-radius:12px;padding:8px;box-shadow:0 3px 12px #0007}
+#top{position:absolute;top:7px;left:7px;right:7px;display:flex;justify-content:space-between;align-items:flex-start}
+#stats{font-size:12px;line-height:1.65}
+#miniWrap{pointer-events:auto;width:120px;height:120px;position:relative;padding:3px}
+#mini{width:112px;height:112px;border-radius:8px}
+#miniLabel{position:absolute;top:5px;left:7px;font-size:9px;text-shadow:0 1px 4px black}
+#location{position:absolute;top:135px;left:8px;font-size:12px}
+#jobStatus{position:absolute;top:169px;left:8px;font-size:11px;max-width:210px}
+#phoneBtn{pointer-events:auto;position:absolute;right:10px;top:138px;background:#7837c6;border-color:#d5a6ff}
+#speed{position:absolute;right:10px;bottom:154px;font-size:17px}
+#interact{pointer-events:auto;position:absolute;right:12px;bottom:91px;background:#087e9e}
+#exitBtn{pointer-events:auto;position:absolute;right:112px;bottom:91px;background:#a34837;display:none}
+#jump{pointer-events:auto;position:absolute;right:12px;bottom:23px}
+#run{pointer-events:auto;position:absolute;right:92px;bottom:23px}
+#joystick{pointer-events:auto;position:absolute;left:17px;bottom:22px;width:116px;height:116px;border-radius:50%;background:#c9e8ff22;border:2px solid #c9e8ff77}
+#stick{position:absolute;left:34px;top:34px;width:44px;height:44px;border-radius:50%;background:#cceaffaa;border:2px solid white}
+#cameraArea{pointer-events:auto;position:absolute;right:0;bottom:0;width:58%;height:57%}
+#cameraToggle{pointer-events:auto;position:absolute;right:10px;top:184px;font-size:10px;padding:7px}
+#toast{position:fixed;z-index:90;left:50%;top:45%;transform:translate(-50%,-50%);background:#101d30;border:1px solid #4bcfff;border-radius:12px;padding:13px 18px;display:none;text-align:center;pointer-events:none}
+#phone,#worldMap,#dialog{position:fixed;z-index:30;inset:2%;display:none;background:#111b2e;border:2px solid #9e69d7;border-radius:20px;padding:13px;overflow:auto;box-shadow:0 0 35px #000b}
+#phone{background:linear-gradient(145deg,#291342,#111e3a);border-color:#bd8aff}
+#phoneHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+#phoneTitle{font-size:20px;font-weight:bold;color:#e7caff}
+#appGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.appIcon{min-height:76px;background:#ffffff13;border:1px solid #ffffff28;border-radius:14px;text-align:center;padding:8px 2px}
+.appIcon .emoji{display:block;font-size:27px;margin-bottom:5px}
+.appIcon small{font-size:10px}
+#appPage{margin-top:12px;background:#091529;border-radius:13px;padding:12px;min-height:190px}
+#appPage button{margin:4px}
+#appPage input,#appPage select{max-width:100%;padding:9px;border-radius:8px;border:1px solid #66809c;background:#17263d;color:white;margin:4px}
+#appPage .item{padding:9px;border-bottom:1px solid #ffffff20}
+#worldMap{background:#0c192a;border-color:#51d5ff}
+#worldCanvas{width:100%;height:68%;background:#172b3c;border-radius:10px;touch-action:none}
+#mapTools{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0}
+#mapClose{background:#933e54}
+#dialog{inset:20% 7%;max-height:60%;z-index:40}
+#landscape{position:fixed;inset:0;background:#081322;z-index:100;display:none;align-items:center;justify-content:center;text-align:center;padding:25px}
+@media(orientation:portrait){#landscape{display:flex}}
+</style>
+</head>
+<body>
+<div id="game"></div>
+
+<!-- =====================================================
+     02. GAME HUD
+===================================================== -->
+<div id="hud">
+ <div id="top">
+  <div class="panel" id="stats">
+   <b>INDIAN LIFE SIMULATOR</b><br>
+   Cash: ₹<span id="cash">2500</span><br>
+   Bank: ₹<span id="bank">5000</span><br>
+   Health: <span id="health">100</span><br>
+   Fuel: <span id="fuel">100</span>%
+  </div>
+  <div id="miniWrap" class="panel">
+   <span id="miniLabel">MINI MAP · 20m EACH SIDE</span>
+   <canvas id="mini" width="224" height="224"></canvas>
+  </div>
+ </div>
+ <div id="location" class="panel">Location: Home</div>
+ <div id="jobStatus" class="panel">Job: None</div>
+ <button id="phoneBtn">📱 PHONE</button>
+ <button id="cameraToggle">CAMERA: THIRD PERSON</button>
+ <div id="speed" class="panel">0 km/h</div>
+ <button id="interact">ACTION</button>
+ <button id="exitBtn">EXIT VEHICLE</button>
+ <button id="run">RUN</button>
+ <button id="jump">JUMP</button>
+ <div id="joystick"><div id="stick"></div></div>
+ <div id="cameraArea"></div>
+</div>
+
+<!-- =====================================================
+     03. PHONE UI
+===================================================== -->
+<div id="phone">
+ <div id="phoneHead">
+  <div><div id="phoneTitle">📱 INDIAN LIFE PHONE</div><small>App Store · Play Store · Phone OS</small></div>
+  <button id="phoneClose">✕ CLOSE</button>
+ </div>
+ <div id="appGrid"></div>
+ <div id="appPage"><h3>Welcome!</h3>Select an app.</div>
+</div>
+
+<!-- =====================================================
+     04. WORLD MAP
+===================================================== -->
+<div id="worldMap">
+ <div style="display:flex;justify-content:space-between;align-items:center">
+  <b>🗺️ WORLD MAP / GPS</b><button id="mapClose">CLOSE</button>
+ </div>
+ <div id="mapTools">
+  <button id="zoomIn">＋</button><button id="zoomOut">－</button>
+  <button id="mapCenter">MY LOCATION</button>
+  <span id="selectedPlace">Destination: None</span>
+ </div>
+ <canvas id="worldCanvas" width="900" height="550"></canvas>
+ <button id="setDestination">SET DESTINATION</button>
+</div>
+
+<div id="dialog"><div id="dialogContent"></div><button onclick="closeDialog()">CLOSE</button></div>
+<div id="toast"></div>
+<div id="landscape">📱<br><br><b>Please rotate your phone to Landscape Mode</b><br><br>गेम खेलने के लिए फोन Horizontal करें।</div>
+
+<!-- =====================================================
+     05. THREE.JS ENGINE
+===================================================== -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+<script>
+"use strict";
+
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
+
+if(!window.THREE){
+ document.body.innerHTML="<h2 style='padding:20px'>3D Engine load नहीं हुआ। Internet ON करके Reload करें।</h2>";
+ throw new Error("Three.js unavailable");
+}
+
+/* =====================================================
+   06. GLOBAL GAME DATA
+===================================================== */
+const places=[
+ ["Home",-20,10],["School",85,85],["Bank",-90,40],
+ ["Hospital",95,-65],["Shopping Mall",10,-100],
+ ["Petrol Pump",-110,-70],["Garage",0,105],
+ ["Office",100,0],["Restaurant / Dhaba",-65,-105],
+ ["Bus Station",130,80],["Taxi Stand",-135,95],
+ ["Park",20,65],["Home Stop",-30,20],
+ ["Market Stop",15,-80],["Park Stop",30,70]
+];
+
+const apps=[
+ ["App Store","🛍️","store"],["Play Store","▶️","play"],
+ ["Bank","🏦","bank"],["Shopping","🛒","shop"],
+ ["Map / GPS","🗺️","map"],["Taxi Booking","🚕","taxi"],
+ ["Jobs","💼","jobs"],["Garage","🔧","garage"],
+ ["Restaurant","🍔","food"],["Car Rental","🚘","rental"],
+ ["Inventory","🎒","inventory"]
+];
+
+let cash=2500,bank=5000,health=100,fuel=100;
+let inventory={Water:2,Food:1};
+let installed=new Set(["store","play","map","jobs"]);
+let rentalCars=0,ownedCars=1;
+let selectedDestination=null,currentJob=null;
+let busStops=[],busIndex=0,busPassengers=0;
+let taxi=null,taxiState="",taxiFare=0;
+let activeVehicle=null,vehicles=[],npcs=[];
+let phoneOpen=false,driving=false;
+let playerYaw=0,camYaw=0,camPitch=.28,camDistance=9;
+let firstPerson=false;
+let joy={x:0,y:0},keys={},running=false,jumpTimer=0;
+let mapZoom=1,mapCenter={x:0,z:0},mapSelected=null;
+let routeLine=null;
+let toastTimer=0;
+let lastTime=0;
+
+/* =====================================================
+   07. THREE.JS SCENE AND LIGHTING
+===================================================== */
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x91c8eb);
+scene.fog=new THREE.Fog(0x91c8eb,180,500);
+
+const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,900);
+const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:"high-performance"});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.3));
+renderer.shadowMap.enabled=false;
+$("game").appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xffffff,0x65775c,2));
+const sun=new THREE.DirectionalLight(0xffffff,1.8);
+sun.position.set(-100,150,80);scene.add(sun);
+
+function material(color,rough=.85){
+ return new THREE.MeshStandardMaterial({color,roughness:rough});
+}
+const M={
+ grass:material(0x719b5b),road:material(0x333b45),
+ line:material(0xe9e0bb),skin:material(0xffc18e),
+ shirt:material(0x2578d0),pants:material(0x26385e),
+ hair:material(0x292020),glass:material(0x77bbd2,.3),
+ window:material(0x6db4d1,.35),roof:material(0x4b5864),
+ wheel:material(0x151719),white:material(0xf4eee1),
+ yellow:material(0xf0c33d),red:material(0xd94d43),
+ green:material(0x32985d),blue:material(0x247bc4)
+};
+function cube(parent,w,h,d,mat,x,y,z){
+ const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+ o.position.set(x,y,z);parent.add(o);return o;
+}
+
+/* =====================================================
+   08. CITY GROUND, ROADS AND STREET OBJECTS
+===================================================== */
+cube(scene,700,.2,700,M.grass,0,-.15,0);
+
+for(let i=-300;i<=300;i+=50){
+ cube(scene,12,.05,700,M.road,i,.01,0);
+ cube(scene,700,.05,12,M.road,0,.02,i);
+ for(let j=-300;j<300;j+=25){
+  cube(scene,.35,.06,7,M.line,i,.05,j);
+  cube(scene,7,.06,.35,M.line,j,.05,i);
+ }
+}
+
+function createTree(x,z){
+ const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);
+ cube(g,.8,5,.8,material(0x76512d),0,2.5,0);
+ const crown=new THREE.Mesh(new THREE.SphereGeometry(3,7,6),material(0x2f7d43));
+ crown.position.y=6;g.add(crown);
+}
+for(let i=0;i<55;i++){
+ const x=(Math.random()-.5)*500,z=(Math.random()-.5)*500;
+ if(Math.abs(x%50)<14||Math.abs(z%50)<14)continue;
+ createTree(x,z);
+}
+
+const buildingObjects=[];
+function createBuilding(name,x,z,color,w=22,h=13,d=18){
+ const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);
+ cube(g,w,h,d,material(color),0,h/2,0);
+ cube(g,w+1,1,d+1,M.roof,0,h,0);
+ for(let xx=-w/2+3;xx<w/2-1;xx+=5)
+  cube(g,2.2,3,.15,M.window,xx,h*.65,d/2+.1);
+ cube(g,4,5,.25,material(0x65452e),0,2.5,d/2+.2);
+ buildingObjects.push({name,x,z,w,d,group:g});
+ return g;
+}
+const buildingData=[
+ ["HOME",-20,10,0xd9b68e],["SCHOOL",85,85,0xe0c568],
+ ["BANK",-90,40,0x89a9c7],["HOSPITAL",95,-65,0xf0eeee],
+ ["MALL",10,-100,0xb7a0d6],["PETROL PUMP",-110,-70,0x6eabbc],
+ ["GARAGE",0,105,0x899eaa],["OFFICE",100,0,0x9eafc0],
+ ["DHABA",-65,-105,0xc58c55],["BUS STATION",130,80,0x8eae9e],
+ ["TAXI STAND",-135,95,0xe3c85c],["PARK",20,65,0x72a66a]
+];
+for(const b of buildingData)createBuilding(...b);
+
+// Garage has open front: remove front wall/door and keep roof + side posts.
+const garageGroup=buildingObjects.find(b=>b.name==="GARAGE").group;
+garageGroup.children[0].visible=false;
+cube(garageGroup,26,1,23,M.roof,0,12,0);
+cube(garageGroup,1,12,1,M.roof,-12,6,0);
+cube(garageGroup,1,12,1,M.roof,12,6,0);
+
+/* =====================================================
+   09. ROBLOX CHARACTER AND ANIMATIONS
+===================================================== */
+function createCharacter(shirt=M.shirt){
+ const root=new THREE.Group();
+ cube(root,1.2,1.5,.65,shirt,0,2.2,0);
+ const head=cube(root,.85,.85,.85,M.skin,0,3.4,0);
+ cube(root,.9,.24,.9,M.hair,0,3.85,0);
+ // Character face is local -Z.
+ cube(root,.12,.12,.04,material(0x202020),-.2,3.45,-.44);
+ cube(root,.12,.12,.04,material(0x202020),.2,3.45,-.44);
+ cube(root,.28,.05,.04,material(0x9b3636),0,3.2,-.45);
+ const la=cube(root,.35,1.3,.4,M.skin,-.85,2.2,0);
+ const ra=cube(root,.35,1.3,.4,M.skin,.85,2.2,0);
+ const ll=cube(root,.45,1.25,.5,M.pants,-.32,.62,0);
+ const rl=cube(root,.45,1.25,.5,M.pants,.32,.62,0);
+ root.userData={la,ra,ll,rl,head};
+ scene.add(root);return root;
+}
+const player=createCharacter();
+player.position.set(-20,0,18);
+
+function animateCharacter(c,t,amount,rate=1){
+ if(!c||!c.userData.la)return;
+ const swing=Math.sin(t*9)*.55*amount*rate;
+ c.userData.la.rotation.x=swing;
+ c.userData.ra.rotation.x=-swing;
+ c.userData.ll.rotation.x=-swing;
+ c.userData.rl.rotation.x=swing;
+}
+function playerPos(){return activeVehicle?activeVehicle.root.position:player.position}
+
+/* =====================================================
+   10. VEHICLE CREATION AND DRIVING
+===================================================== */
+function createVehicle(type,x,z,color=0x287bc1){
+ const root=new THREE.Group();root.position.set(x,0,z);scene.add(root);
+ const bus=type==="bus";
+ cube(root,bus?3.7:2.3,bus?1.6:.85,bus?7:4,material(color),0,1.1,0);
+ cube(root,bus?3.4:2,bus?1.15:.9,bus?3.7:2,M.glass,0,bus?2.15:2,0);
+ const wheels=[];
+ const wheelZ=bus?[-2.5,2.5]:[-1.3,1.3];
+ for(const xx of [-1.2,1.2])for(const zz of wheelZ){
+  const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.42,.42,.25,10),M.wheel);
+  wheel.rotation.z=Math.PI/2;wheel.position.set(xx,.5,zz);
+  root.add(wheel);wheels.push(wheel);
+ }
+ const v={root,type,wheels,speed:0,yaw:0,health:100,fuel:100};
+ vehicles.push(v);return v;
+}
+const starterCar=createVehicle("car",-12,22,0x176dc4);
+
+function enterVehicle(v){
+ if(!v||driving)return;
+ if(distance(player.position,v.root.position)>8)return toast("Vehicle is too far away");
+ activeVehicle=v;driving=true;player.visible=false;
+ $("exitBtn").style.display="block";
+ toast("Entered "+v.type.toUpperCase());
+}
+function exitVehicle(){
+ if(!activeVehicle)return;
+ const p=activeVehicle.root.position;
+ player.position.set(p.x+3,0,p.z+2);
+ player.visible=true;activeVehicle=null;driving=false;
+ $("exitBtn").style.display="none";
+}
+$("exitBtn").onclick=exitVehicle;
+
+function updateVehicle(v,dt){
+ if(v===activeVehicle){
+  const throttle=(keys.w?1:0)-(keys.s?1:0)-joy.y;
+  const steer=(keys.d?1:0)-(keys.a?1:0)+joy.x;
+  v.speed+=(throttle*22-v.speed*1.5)*dt;
+  v.speed=clamp(v.speed,-11,24);
+  v.yaw+=steer*dt*(.8+Math.abs(v.speed)*.035);
+  v.root.rotation.y=v.yaw;
+  // Local forward is -Z, same as the character face.
+  v.root.position.x-=Math.sin(v.yaw)*v.speed*dt;
+  v.root.position.z-=Math.cos(v.yaw)*v.speed*dt;
+  if(v.speed!==0&&fuel>0)fuel=Math.max(0,fuel-Math.abs(v.speed)*dt*.002);
+  if(fuel<=0)v.speed=0;
+ }else v.speed*=.96;
+ v.wheels.forEach(w=>w.rotation.x+=v.speed*dt*1.5);
+}
+function nearbyVehicle(){
+ const p=playerPos();let best=null,dist=8;
+ for(const v of vehicles){
+  const d=distance(p,v.root.position);
+  if(d<dist){dist=d;best=v}
+ }
+ return best;
+}
+
+/* =====================================================
+   11. NPC WALKING AND ANIMATIONS
+===================================================== */
+const npcs=[];
+function spawnNPC(x,z){
+ const c=createCharacter(material([0x3a9f9b,0xb56a9a,0xd4a94d,0x668bd0][Math.floor(Math.random()*4)]));
+ c.position.set(x,0,z);
+ c.userData.target=new THREE.Vector3(x+Math.random()*25-12,0,z+Math.random()*25-12);
+ npcs.push(c);
+}
+for(let i=0;i<12;i++)spawnNPC((Math.random()-.5)*180,(Math.random()-.5)*180);
+
+function updateNPCs(dt,t){
+ for(const n of npcs){
+  const target=n.userData.target;
+  const dx=target.x-n.position.x,dz=target.z-n.position.z;
+  const d=Math.hypot(dx,dz);
+  if(d<2)n.userData.target.set(n.position.x+(Math.random()-.5)*30,0,n.position.z+(Math.random()-.5)*30);
+  else{
+   n.position.x+=dx/d*dt*1.8;
+   n.position.z+=dz/d*dt*1.8;
+   n.rotation.y=Math.atan2(-dx,-dz);
+  }
+  animateCharacter(n,t,1,.55);
+ }
+}
+
+/* =====================================================
+   12. GPS AND DESTINATION
+===================================================== */
+function clearGPS(){
+ if(routeLine){scene.remove(routeLine);routeLine.geometry.dispose();routeLine=null}
+}
+function setGPS(place){
+ if(!place)return toast("Choose a destination first");
+ selectedDestination=place;
+ clearGPS();
+ const p=playerPos();
+ const points=[new THREE.Vector3(p.x,.45,p.z),new THREE.Vector3(place[1],.45,place[2])];
+ routeLine=new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints(points),
+  new THREE.LineBasicMaterial({color:0x00eaff})
+ );
+ scene.add(routeLine);
+ $("selectedPlace").textContent="Destination: "+place[0];
+ toast("GPS set: "+place[0]);
+ drawWorldMap();
+}
+function distanceToDestination(){
+ if(!selectedDestination)return 0;
+ const p=playerPos();
+ return Math.round(Math.hypot(p.x-selectedDestination[1],p.z-selectedDestination[2]));
+}
+
+/* =====================================================
+   13. PHONE HOME AND APP INSTALLATION
+===================================================== */
+function openPhone(){
+ phoneOpen=true;$("phone").style.display="block";
+ renderPhone();
+ $("appPage").innerHTML="<h3>Welcome to Indian Life Phone</h3><p>Select an app above.</p>";
+}
+function closePhone(){
+ phoneOpen=false;$("phone").style.display="none";
+}
+$("phoneBtn").onclick=openPhone;
+$("phoneClose").onclick=closePhone;
+
+function renderPhone(){
+ const grid=$("appGrid");grid.innerHTML="";
+ for(const a of apps){
+  const installedApp=installed.has(a[2]);
+  const b=document.createElement("button");
+  b.className="appIcon";
+  const emoji=document.createElement("span");
+  emoji.className="emoji";emoji.textContent=a[1];
+  const name=document.createElement("small");
+  name.textContent=a[0];
+  const status=document.createElement("small");
+  status.textContent=installedApp?"OPEN":"INSTALL";
+  b.append(emoji,name,document.createElement("br"),status);
+  b.onclick=()=>openApp(a[2]);
+  grid.appendChild(b);
+ }
+}
+function page(title,html){
+ $("appPage").innerHTML="<h3>"+title+"</h3>"+html;
+}
+function openApp(id){
+ if(!installed.has(id)&&id!=="store"&&id!=="play"){
+  page("Install "+id.toUpperCase(),"<p>This app is not installed.</p>");
+  const b=document.createElement("button");
+  b.textContent="INSTALL APP";
+  b.onclick=()=>{installed.add(id);saveGame();renderPhone();openApp(id);toast("App installed")};
+  $("appPage").appendChild(b);return;
+ }
+ switch(id){
+  case "store":showStore("store");break;
+  case "play":showStore("play");break;
+  case "bank":showBank();break;
+  case "shop":showShopping();break;
+  case "map":closePhone();openMap();break;
+  case "taxi":showTaxi();break;
+  case "jobs":showJobs();break;
+  case "garage":showGarage();break;
+  case "food":showRestaurant();break;
+  case "rental":showRental();break;
+  case "inventory":showInventory();break;
+ }
+}
+function showStore(which){
+ let html="<p>Game Store — Apps install locally in this game.</p>";
+ for(const a of apps){
+  if(a[2]==="store"||a[2]==="play")continue;
+  html+='<div class="item">'+a[1]+' <b>'+a[0]+'</b> ';
+  html+=installed.has(a[2])?"<b>INSTALLED</b>":
+   '<button data-install="'+a[2]+'">INSTALL</button>';
+  html+="</div>";
+ }
+ page(which==="play"?"▶️ Play Store":"🛍️ App Store",html);
+ $("appPage").querySelectorAll("[data-install]").forEach(b=>{
+  b.onclick=()=>installApp(b.dataset.install);
+ });
+}
+function installApp(id){
+ installed.add(id);saveGame();renderPhone();showStore("store");
+ toast("App installed successfully");
+}
+
+/* =====================================================
+   14. BANKING SYSTEM
+===================================================== */
+  function showBank(){
+ page("🏦 BANK",
+ '<p>Cash Wallet: ₹'+cash+'</p><p>Bank Balance: ₹'+bank+'</p>'+
+ '<input id="bankAmount" type="number" min="1" placeholder="Enter amount">'+
+ '<button data-action="deposit">DEPOSIT</button>'+
+ '<button data-action="withdraw">WITHDRAW</button>');
+ $("appPage").querySelector('[data-action="deposit"]').onclick=()=>bankTransaction("deposit");
+ $("appPage").querySelector('[data-action="withdraw"]').onclick=()=>bankTransaction("withdraw");
+}
+function bankTransaction(type){
+ const amount=Math.floor(Number($("bankAmount").value));
+ if(!Number.isFinite(amount)||amount<=0)return toast("Enter a valid amount");
+ if(type==="deposit"){
+  if(cash<amount)return toast("Not enough wallet cash");
+  cash-=amount;bank+=amount;
+ }else{
+  if(bank<amount)return toast("Not enough bank balance");
+  bank-=amount;cash+=amount;
+ }
+ saveGame();updateHUD();showBank();toast("Bank transaction successful");
+}
+
+/* =====================================================
+   15. SHOPPING SYSTEM
+===================================================== */
+const products=[
+ ["Water",50],["Food",100],["Med Kit",250],
+ ["Phone Cover",150],["School Bag",300],["Shoes",500]
+];
+function showShopping(){
+ let html="<p>Choose an item:</p>";
+ products.forEach((p,i)=>{
+  html+='<div class="item">'+p[0]+' — ₹'+p[1]+' <button data-buy="'+i+'">BUY</button></div>';
+ });
+ page("🛒 SHOPPING",html);
+ $("appPage").querySelectorAll("[data-buy]").forEach(b=>{
+  b.onclick=()=>buyProduct(Number(b.dataset.buy));
+ });
+}
+function buyProduct(i){
+ const p=products[i];if(!p)return;
+ if(cash<p[1])return toast("Not enough cash");
+ cash-=p[1];inventory[p[0]]=(inventory[p[0]]||0)+1;
+ saveGame();updateHUD();showShopping();toast(p[0]+" added to Inventory");
+}
+
+/* =====================================================
+   16. TAXI BOOKING AND JOURNEY
+===================================================== */
+function showTaxi(){
+ let html='<p>Select Destination</p><select id="taxiDestination">';
+ places.forEach((p,i)=>html+='<option value="'+i+'">'+p[0]+'</option>');
+ html+='</select><p>Taxi fare: Base ₹150 + ₹2 per metre.</p>';
+ html+='<button id="bookTaxi">BOOK TAXI</button>';
+ page("🚕 TAXI BOOKING",html);
+ $("bookTaxi").onclick=bookTaxi;
+}
+function bookTaxi(){
+ if(taxi)return toast("Taxi booking already active");
+ const index=Number($("taxiDestination").value);
+ const dest=places[index];if(!dest)return;
+ const p=playerPos();
+ taxiFare=Math.ceil(150+Math.hypot(dest[1]-p.x,dest[2]-p.z)*2);
+ if(cash<taxiFare)return toast("Not enough money for taxi");
+ taxi=createVehicle("taxi",p.x+28,p.z+28,0xf0c73e);
+ taxi.destination=dest;taxiState="coming";
+ page("TAXI BOOKED",
+ "<p>Your taxi is coming to your location.</p><p>Fare: ₹"+taxiFare+"</p><p id='taxiStatus'>Status: Coming</p>");
+ const enter=document.createElement("button");
+ enter.textContent="ENTER TAXI";
+ enter.onclick=enterTaxi;
+ $("appPage").appendChild(enter);
+ toast("Taxi booked. Wait for arrival.");
+}
+function moveVehicleTo(v,x,z,dt,speed){
+ const dx=x-v.root.position.x,dz=z-v.root.position.z;
+ const d=Math.hypot(dx,dz);
+ if(d>1){
+  v.root.position.x+=dx/d*speed*dt;
+  v.root.position.z+=dz/d*speed*dt;
+  v.root.rotation.y=Math.atan2(-dx,-dz);
+  v.wheels.forEach(w=>w.rotation.x+=dt*speed);
+ }
+ return d;
+}
+function updateTaxi(dt){
+ if(!taxi)return;
+ if(taxiState==="coming"){
+  const p=playerPos();
+  const d=moveVehicleTo(taxi,p.x+3,p.z+3,dt,12);
+  if(d<4){taxiState="arrived";toast("Taxi arrived. Press ENTER TAXI.");}
+ }
+ if(taxiState==="riding"){
+  const d=taxi.destination;
+  const dist=moveVehicleTo(taxi,d[1],d[2],dt,16);
+  if(dist<3){
+   cash-=taxiFare;
+   taxi.root.position.set(d[1],0,d[2]);
+   player.position.set(d[1],0,d[2]+3);
+   player.visible=true;activeVehicle=null;driving=false;
+   $("exitBtn").style.display="none";
+   scene.remove(taxi.root);
+   vehicles=vehicles.filter(v=>v!==taxi);
+   taxi=null;taxiState="";
+   saveGame();updateHUD();toast("Taxi journey completed!");
+  }
+ }
+}
+function enterTaxi(){
+ if(!taxi||taxiState!=="arrived")return toast("Taxi is not here yet");
+ enterVehicle(taxi);taxiState="riding";
+ toast("Taxi journey started");
+}
+
+/* =====================================================
+   17. JOBS AND SCHOOL BUS
+===================================================== */
+function showJobs(){
+ page("💼 JOBS",
+ '<p>Choose your work:</p>'+
+ '<button id="busJob">🚌 SCHOOL BUS DRIVER</button>'+
+ '<button id="taxiJob">🚕 TAXI DRIVER</button>'+
+ '<button id="deliveryJob">🍔 FOOD DELIVERY</button>'+
+ '<p>Complete jobs to earn money.</p>');
+ $("busJob").onclick=startBusJob;
+ $("taxiJob").onclick=startTaxiDriver;
+ $("deliveryJob").onclick=startDeliveryJob;
+}
+function startBusJob(){
+ if(currentJob)return toast("Finish your current job first");
+ const p=playerPos();
+ currentJob={type:"School Bus Driver",stage:"pickup",reward:1200,destination:places[1]};
+ busStops=[places[12],places[13],places[14]];
+ busIndex=0;busPassengers=0;
+ const bus=createVehicle("bus",p.x+5,p.z+8,0xe7c23d);
+ enterVehicle(bus);
+ setGPS(busStops[0]);updateJobHUD();
+ toast("Bus job started. Go to Home Stop.");
+}
+function startTaxiDriver(){
+ if(currentJob)return toast("Finish your current job first");
+ const p=playerPos();
+ currentJob={type:"Taxi Driver",stage:"drive",reward:900,destination:places[10]};
+ const car=createVehicle("taxi",p.x+5,p.z+5,0xe8c33d);
+ enterVehicle(car);setGPS(currentJob.destination);updateJobHUD();
+}
+function startDeliveryJob(){
+ if(currentJob)return toast("Finish your current job first");
+ currentJob={type:"Food Delivery",stage:"deliver",reward:500,destination:places[8]};
+ setGPS(currentJob.destination);updateJobHUD();
+ toast("Food delivery started. Reach the Restaurant.");
+}
+function updateJobHUD(){
+ $("jobStatus").textContent=currentJob?
+ "Job: "+currentJob.type+" · "+currentJob.stage+
+ (currentJob.type==="School Bus Driver"?" · Passengers "+busPassengers:""):
+ "Job: None";
+}
+function busAction(){
+ if(!currentJob||currentJob.type!=="School Bus Driver")return;
+ if(!activeVehicle||activeVehicle.type!=="bus")return toast("Enter the School Bus first");
+ const p=playerPos();
+ const stop=busStops[busIndex];
+ if(currentJob.stage==="pickup"){
+  if(!stop||Math.hypot(p.x-stop[1],p.z-stop[2])>13)
+   return toast("GPS Stop ke paas bus roko");
+  if(Math.abs(activeVehicle.speed)>1)return toast("Bus ko completely stop karo");
+  const count=Math.min(3,10-busPassengers);
+  busPassengers+=count;
+  busIndex++;
+  if(busIndex<busStops.length){
+   setGPS(busStops[busIndex]);
+   toast(count+" students boarded. Total "+busPassengers);
+  }else{
+   currentJob.stage="drop";
+   setGPS(currentJob.destination);
+   toast("Pickup complete. Now drive to School.");
+  }
+ }else if(currentJob.stage==="drop"){
+  if(Math.hypot(p.x-currentJob.destination[1],p.z-currentJob.destination[2])>15)
+   return toast("School ke paas bus roko");
+  if(Math.abs(activeVehicle.speed)>1)return toast("Stop the bus first");
+  const reward=currentJob.reward;
+  busPassengers=0;cash+=reward;
+  currentJob=null;clearGPS();saveGame();updateHUD();updateJobHUD();
+  toast("Bus job completed! +₹"+reward);
+ }
+}
+function finishSimpleJob(){
+ if(!currentJob)return;
+ const p=playerPos(),d=currentJob.destination;
+ if(Math.hypot(p.x-d[1],p.z-d[2])>15)return toast("GPS destination tak jao");
+ if(currentJob.type==="Taxi Driver"&&!driving)return toast("Enter your taxi first");
+ const reward=currentJob.reward;
+ cash+=reward;currentJob=null;clearGPS();saveGame();updateHUD();updateJobHUD();
+ toast("Job complete! +₹"+reward);
+}
+
+/* =====================================================
+   18. GARAGE AND CAR PURCHASE
+===================================================== */
+  function showGarage(){
+ const v=activeVehicle||nearbyVehicle()||starterCar;
+ page("🔧 GARAGE",
+ "<p>Vehicle Health: "+v.health+"%</p>"+
+ "<p>Fuel: "+fuel+"%</p>"+
+ '<button id="repair">REPAIR — ₹300</button>'+
+ '<button id="buyCar">BUY NEW CAR — ₹6500</button>'+
+ '<button id="fuelCar">REFUEL — ₹200</button>');
+ $("repair").onclick=()=>{
+  if(cash<300)return toast("Not enough cash");
+  cash-=300;v.health=100;saveGame();updateHUD();showGarage();toast("Vehicle repaired");
+ };
+ $("buyCar").onclick=buyCar;
+ $("fuelCar").onclick=()=>{
+  if(cash<200)return toast("Not enough cash");
+  cash-=200;fuel=100;saveGame();updateHUD();showGarage();toast("Fuel filled");
+ };
+}
+function buyCar(){
+ if(cash<6500)return toast("Need ₹6500");
+ cash-=6500;ownedCars++;
+ const p=playerPos();createVehicle("car",p.x+8,p.z+5,0x9148d2);
+ saveGame();updateHUD();showGarage();toast("New car purchased!");
+}
+
+/* =====================================================
+   19. CAR RENTAL BUSINESS
+===================================================== */
+function showRental(){
+ page("🚘 CAR RENTAL",
+ "<p>Listed cars: "+rentalCars+"</p>"+
+ "<p>Rental income per collection: ₹200 per listed car</p>"+
+ '<button id="listCar">LIST NEARBY CAR</button>'+
+ '<button id="collectRent">COLLECT RENT</button>');
+ $("listCar").onclick=()=>{
+  if(!nearbyVehicle())return toast("Bring your car close first");
+  rentalCars++;saveGame();showRental();toast("Your car is listed");
+ };
+ $("collectRent").onclick=()=>{
+  if(rentalCars<1)return toast("No listed rental cars");
+  const income=rentalCars*200;cash+=income;
+  saveGame();updateHUD();showRental();toast("Rental income ₹"+income);
+ };
+}
+
+/* =====================================================
+   20. RESTAURANT AND FOOD
+===================================================== */
+function showRestaurant(){
+ page("🍔 RESTAURANT / DHABA",
+ '<p>Meal Plate — ₹120 <button data-food="120">ORDER</button></p>'+
+ '<p>Snack Box — ₹70 <button data-food="70">ORDER</button></p>'+
+ '<p>Juice — ₹40 <button data-food="40">ORDER</button></p>');
+ $("appPage").querySelectorAll("[data-food]").forEach(b=>{
+  b.onclick=()=>orderFood(Number(b.dataset.food));
+ });
+}
+function orderFood(price){
+ if(cash<price)return toast("Not enough money");
+ cash-=price;updateHUD();saveGame();
+ toast("Food order accepted. Preparing...");
+ setTimeout(()=>{
+  inventory.Food=(inventory.Food||0)+1;
+  saveGame();toast("Food delivered to your Inventory");
+ },4000);
+}
+
+/* =====================================================
+   21. INVENTORY
+===================================================== */
+function showInventory(){
+ let html="<p>Your Items</p>";
+ for(const [name,count] of Object.entries(inventory)){
+  html+='<div class="item">'+name+': <b>'+count+'</b></div>';
+ }
+ html+="<p>Owned Cars: "+ownedCars+"</p>";
+ html+="<p>Listed Rental Cars: "+rentalCars+"</p>";
+ page("🎒 INVENTORY",html);
+}
+
+/* =====================================================
+   22. WORLD MAP WITH ZOOM AND PAN
+===================================================== */
+const worldCanvas=$("worldCanvas"),wctx=worldCanvas.getContext("2d");
+function drawWorldMap(){
+ const w=worldCanvas.width,h=worldCanvas.height;
+ wctx.clearRect(0,0,w,h);
+ wctx.fillStyle="#172b3c";wctx.fillRect(0,0,w,h);
+ const scale=mapZoom*1.25;
+ const sx=x=>w/2+(x-mapCenter.x)*scale;
+ const sy=z=>h/2+(z-mapCenter.z)*scale;
+ wctx.strokeStyle="#60727f";wctx.lineWidth=7*mapZoom;
+ for(let i=-300;i<=300;i+=50){
+  wctx.beginPath();wctx.moveTo(sx(i),0);wctx.lineTo(sx(i),h);wctx.stroke();
+  wctx.beginPath();wctx.moveTo(0,sy(i));wctx.lineTo(w,sy(i));wctx.stroke();
+ }
+ for(const p of places){
+  const x=sx(p[1]),y=sy(p[2]);
+  if(x<0||x>w||y<0||y>h)continue;
+  wctx.fillStyle="#f0c84f";wctx.beginPath();wctx.arc(x,y,6,0,7);wctx.fill();
+  wctx.fillStyle="white";wctx.font="13px Arial";wctx.fillText(p[0],x+8,y-8);
+ }
+ const p=playerPos();
+ wctx.save();wctx.translate(sx(p.x),sy(p.z));wctx.rotate(playerYaw);
+ wctx.fillStyle="#28e4ff";wctx.beginPath();
+ wctx.moveTo(0,-13);wctx.lineTo(-8,9);wctx.lineTo(8,9);wctx.closePath();wctx.fill();
+ wctx.restore();
+ if(selectedDestination){
+  wctx.strokeStyle="#00eaff";wctx.lineWidth=3;
+  wctx.beginPath();wctx.moveTo(sx(p.x),sy(p.z));
+  wctx.lineTo(sx(selectedDestination[1]),sy(selectedDestination[2]));wctx.stroke();
+ }
+}
+function openMap(){
+ $("worldMap").style.display="block";
+ mapCenter={x:playerPos().x,z:playerPos().z};
+ drawWorldMap();
+}
+$("mapClose").onclick=()=>$("worldMap").style.display="none";
+$("zoomIn").onclick=()=>{mapZoom=Math.min(5,mapZoom*1.25);drawWorldMap()};
+$("zoomOut").onclick=()=>{mapZoom=Math.max(.3,mapZoom/1.25);drawWorldMap()};
+$("mapCenter").onclick=()=>{mapCenter={x:playerPos().x,z:playerPos().z};drawWorldMap()};
+$("setDestination").onclick=()=>{
+ if(!mapSelected)return toast("Select a named location");
+ setGPS(mapSelected);$("worldMap").style.display="none";
+};
+let mapDrag=null;
+worldCanvas.addEventListener("pointerdown",e=>{
+ mapDrag={x:e.clientX,y:e.clientY,cx:mapCenter.x,cz:mapCenter.z,moved:false};
+ worldCanvas.setPointerCapture(e.pointerId);
+});
+worldCanvas.addEventListener("pointermove",e=>{
+ if(!mapDrag)return;
+ const dx=e.clientX-mapDrag.x,dy=e.clientY-mapDrag.y;
+ if(Math.hypot(dx,dy)>5)mapDrag.moved=true;
+ if(mapDrag.moved){
+  const rect=worldCanvas.getBoundingClientRect();
+  const scale=mapZoom*1.25;
+  mapCenter.x=mapDrag.cx-dx/rect.width*worldCanvas.width/scale;
+  mapCenter.z=mapDrag.cz-dy/rect.height*worldCanvas.height/scale;
+  drawWorldMap();
+ }
+});
+worldCanvas.addEventListener("pointerup",e=>{
+ if(!mapDrag)return;
+ if(!mapDrag.moved){
+  const rect=worldCanvas.getBoundingClientRect();
+  const wx=(e.clientX-rect.left-rect.width/2)/rect.width*worldCanvas.width/(mapZoom*1.25)+mapCenter.x;
+  const wz=(e.clientY-rect.top-rect.height/2)/rect.height*worldCanvas.height/(mapZoom*1.25)+mapCenter.z;
+  let best=null,dist=1e9;
+  for(const p of places){
+   const d=Math.hypot(p[1]-wx,p[2]-wz);
+   if(d<dist){best=p;dist=d}
+  }
+  if(best&&dist<28){
+   mapSelected=best;$("selectedPlace").textContent="Destination: "+best[0];
+   toast("Selected "+best[0]);drawWorldMap();
+  }
+ }
+ mapDrag=null;
+});
+
+/* =====================================================
+   23. MINI MAP WITH DIRECTION TRIANGLE
+===================================================== */
+function drawMiniMap(){
+ const c=$("mini"),ctx=c.getContext("2d"),s=c.width;
+ ctx.clearRect(0,0,s,s);
+ ctx.fillStyle="#182b3b";ctx.fillRect(0,0,s,s);
+ const scale=s/40,p=playerPos();
+ const X=x=>s/2+(x-p.x)*scale;
+ const Y=z=>s/2+(z-p.z)*scale;
+ ctx.strokeStyle="#61717d";ctx.lineWidth=5;
+ for(let i=-300;i<=300;i+=50){
+  ctx.beginPath();ctx.moveTo(X(i),0);ctx.lineTo(X(i),s);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,Y(i));ctx.lineTo(s,Y(i));ctx.stroke();
+ }
+ for(const place of places){
+  const x=X(place[1]),y=Y(place[2]);
+  if(x<0||x>s||y<0||y>s)continue;
+  ctx.fillStyle="#f0c84b";ctx.fillRect(x-3,y-3,6,6);
+ }
+ if(selectedDestination){
+  ctx.strokeStyle="#00eaff";ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(s/2,s/2);
+  ctx.lineTo(X(selectedDestination[1]),Y(selectedDestination[2]));ctx.stroke();
+ }
+ // Player triangle. Its pointed tip is the face / forward direction.
+ ctx.save();
+ ctx.translate(s/2,s/2);
+ ctx.rotate(playerYaw);
+ ctx.fillStyle="#22e8ff";ctx.strokeStyle="white";ctx.lineWidth=3;
+ ctx.beginPath();ctx.moveTo(0,-15);ctx.lineTo(-10,11);ctx.lineTo(10,11);ctx.closePath();
+ ctx.fill();ctx.stroke();ctx.restore();
+}
+$("mini").addEventListener("click",openMap);
+
+/* =====================================================
+   24. INTERACTION AND BUILDING PROXIMITY
+===================================================== */
+function nearestPlace(){
+ const p=playerPos();let best=null,distanceValue=1e9;
+ for(const a of places){
+  const d=Math.hypot(p.x-a[1],p.z-a[2]);
+  if(d<distanceValue){distanceValue=d;best=a}
+ }
+ return {place:best,distance:distanceValue};
+}
+function interact(){
+ if(driving){
+  if(activeVehicle&&activeVehicle.type==="bus")busAction();
+  else if(currentJob&&currentJob.type==="Taxi Driver")finishSimpleJob();
+  return;
+ }
+ const v=nearbyVehicle();
+ if(v){enterVehicle(v);return}
+ const n=nearestPlace();
+ if(n.distance<18){
+  switch(n.place[0]){
+   case "Bank":openPhoneWith("bank");break;
+   case "Garage":openPhoneWith("garage");break;
+   case "Restaurant":openPhoneWith("food");break;
+   case "School":
+    if(currentJob&&currentJob.type==="School Bus Driver")busAction();
+    else toast("Welcome to School");
+    break;
+   case "Petrol Pump":openPhoneWith("garage");break;
+   default:toast("You are near "+n.place[0]);
+  }
+ }else{
+  if(currentJob&&currentJob.type==="Food Delivery")finishSimpleJob();
+  else toast("No nearby vehicle or location");
+ }
+}
+function openPhoneWith(id){openPhone();openApp(id)}
+$("interact").onclick=interact;
+
+/* =====================================================
+   25. JOYSTICK AND KEYBOARD CONTROLS
+===================================================== */
+  const joyBase=$("joystick"),stick=$("stick");
+let joyPointer=null;
+joyBase.addEventListener("pointerdown",e=>{
+ joyPointer=e.pointerId;joyBase.setPointerCapture(e.pointerId);moveJoystick(e);
+});
+joyBase.addEventListener("pointermove",e=>{
+ if(e.pointerId===joyPointer)moveJoystick(e);
+});
+function moveJoystick(e){
+ const r=joyBase.getBoundingClientRect();
+ let dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2);
+ const len=Math.hypot(dx,dy),max=42;
+ if(len>max){dx=dx/len*max;dy=dy/len*max}
+ joy.x=dx/max;joy.y=dy/max;
+ stick.style.left=(34+dx)+"px";stick.style.top=(34+dy)+"px";
+}
+function resetJoystick(){
+ joyPointer=null;joy.x=0;joy.y=0;
+ stick.style.left="34px";stick.style.top="34px";
+}
+joyBase.addEventListener("pointerup",resetJoystick);
+joyBase.addEventListener("pointercancel",resetJoystick);
+
+addEventListener("keydown",e=>{
+ keys[e.key.toLowerCase()]=true;
+ if(e.key===" "&&!driving)jumpTimer=.55;
+ if(e.key.toLowerCase()==="e")interact();
+ if(e.key.toLowerCase()==="p")openPhone();
+});
+addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
+
+$("run").onpointerdown=()=>running=true;
+$("run").onpointerup=()=>running=false;
+$("run").onpointercancel=()=>running=false;
+$("run").onpointerleave=()=>running=false;
+$("jump").onclick=()=>{if(!driving&&jumpTimer<=0)jumpTimer=.55};
+
+/* =====================================================
+   26. 360 DEGREE CAMERA AND CAMERA MODES
+===================================================== */
+let camPointer=null,lastCamX=0,lastCamY=0;
+$("cameraArea").addEventListener("pointerdown",e=>{
+ camPointer=e.pointerId;lastCamX=e.clientX;lastCamY=e.clientY;
+ $("cameraArea").setPointerCapture(e.pointerId);
+});
+$("cameraArea").addEventListener("pointermove",e=>{
+ if(e.pointerId!==camPointer)return;
+ camYaw-=(e.clientX-lastCamX)*.008;
+ camPitch=clamp(camPitch+(e.clientY-lastCamY)*.006,-.2,1.1);
+ lastCamX=e.clientX;lastCamY=e.clientY;
+});
+$("cameraArea").addEventListener("pointerup",()=>camPointer=null);
+$("cameraArea").addEventListener("pointercancel",()=>camPointer=null);
+$("cameraToggle").onclick=()=>{
+ firstPerson=!firstPerson;
+ $("cameraToggle").textContent=firstPerson?"CAMERA: FIRST PERSON":"CAMERA: THIRD PERSON";
+ camDistance=firstPerson?1.2:9;
+};
+
+/* =====================================================
+   27. PLAYER MOVEMENT AND JUMP ANIMATION
+===================================================== */
+function updatePlayer(dt,t){
+ if(driving||phoneOpen||$("worldMap").style.display==="block")return;
+ const f=clamp(-(keys.w?1:0)-joy.y,-1,1);
+ const s=clamp((keys.d?1:0)-(keys.a?1:0)+joy.x,-1,1);
+ const speed=running?9:5;
+ const dx=(-Math.sin(camYaw)*f+Math.cos(camYaw)*s)*speed*dt;
+ const dz=(-Math.cos(camYaw)*f-Math.sin(camYaw)*s)*speed*dt;
+ player.position.x+=dx;player.position.z+=dz;
+ const moving=Math.abs(f)+Math.abs(s)>.1;
+ if(moving){
+  playerYaw=Math.atan2(-dx,-dz);
+  player.rotation.y=playerYaw;
+ }
+ if(jumpTimer>0){
+  jumpTimer-=dt;
+  player.position.y=Math.sin((.55-jumpTimer)/.55*Math.PI)*1.8;
+ }else player.position.y=0;
+ animateCharacter(player,t,moving?1:0,running?1.5:1);
+}
+
+/* =====================================================
+   28. CAMERA FOLLOW
+===================================================== */
+function updateCamera(){
+ const p=playerPos();
+ if(firstPerson&&!driving){
+  camera.position.set(p.x,p.y+3.25,p.z);
+  camera.rotation.order="YXZ";
+  camera.rotation.y=camYaw;
+  camera.rotation.x=camPitch-.2;
+  return;
+ }
+ const target=new THREE.Vector3(p.x,driving?2.2:2.6,p.z);
+ const d=driving?camDistance+2:camDistance;
+ camera.position.set(
+  target.x+Math.sin(camYaw)*Math.cos(camPitch)*d,
+  target.y+Math.sin(camPitch)*d+1,
+  target.z+Math.cos(camYaw)*Math.cos(camPitch)*d
+ );
+ camera.lookAt(target);
+}
+
+/* =====================================================
+   29. HUD UPDATES
+===================================================== */
+function updateHUD(){
+ $("cash").textContent=Math.floor(cash);
+ $("bank").textContent=Math.floor(bank);
+ $("health").textContent=health;
+ $("fuel").textContent=Math.floor(fuel);
+ const n=nearestPlace();
+ $("location").textContent="Location: "+(n.place?n.place[0]:"City");
+ const v=activeVehicle;
+ $("speed").textContent=v?Math.round(Math.abs(v.speed)*3.6)+" km/h":"0 km/h";
+ updateJobHUD();
+}
+function toast(message){
+ const el=$("toast");el.textContent=message;el.style.display="block";
+ clearTimeout(toastTimer);
+ toastTimer=setTimeout(()=>el.style.display="none",2200);
+}
+
+/* =====================================================
+   30. SAVE AND LOAD SYSTEM
+===================================================== */
+function saveGame(){
+ const data={
+  cash,bank,health,fuel,inventory,installed:[...installed],
+  rentalCars,ownedCars
+ };
+ try{localStorage.setItem("IndianRobloxLifeP5",JSON.stringify(data))}
+ catch(e){toast("Save storage unavailable")}
+}
+function loadGame(){
+ try{
+  const raw=localStorage.getItem("IndianRobloxLifeP5");
+  if(!raw)return;
+  const d=JSON.parse(raw);
+  if(Number.isFinite(d.cash))cash=d.cash;
+  if(Number.isFinite(d.bank))bank=d.bank;
+  if(Number.isFinite(d.health))health=d.health;
+  if(Number.isFinite(d.fuel))fuel=d.fuel;
+  if(d.inventory&&typeof d.inventory==="object")inventory=d.inventory;
+  if(Array.isArray(d.installed))installed=new Set(d.installed);
+  if(Number.isFinite(d.rentalCars))rentalCars=d.rentalCars;
+  if(Number.isFinite(d.ownedCars))ownedCars=d.ownedCars;
+ }catch(e){console.warn("Save data invalid; starting new game")}
+}
+
+/* =====================================================
+   31. MAIN GAME LOOP
+===================================================== */
+function gameLoop(now){
+ requestAnimationFrame(gameLoop);
+ const dt=Math.min((now-lastTime)/1000||0,.04);
+ lastTime=now;
+ const t=now/1000;
+
+ updatePlayer(dt,t);
+ for(const v of vehicles)updateVehicle(v,dt);
+ updateTaxi(dt);
+ updateNPCs(dt,t);
+ updateCamera();
+ drawMiniMap();
+ if($("worldMap").style.display==="block")drawWorldMap();
+ updateHUD();
+ renderer.render(scene,camera);
+}
+
+/* =====================================================
+   32. STARTUP AND RESIZE
+===================================================== */
+loadGame();
+renderPhone();
+updateHUD();
+requestAnimationFrame(gameLoop);
+
+addEventListener("resize",()=>{
+ camera.aspect=innerWidth/innerHeight;
+ camera.updateProjectionMatrix();
+ renderer.setSize(innerWidth,innerHeight);
+});
+
+setInterval(saveGame,10000);
+addEventListener("beforeunload",saveGame);
+
+/* =====================================================
+   33. PHONE AND MAP KEYBOARD SUPPORT
+===================================================== */
+$("phone").addEventListener("click",e=>{
+ if(e.target=== $("phone"))closePhone();
+});
+$("worldMap").addEventListener("click",e=>{
+ if(e.target===$("worldMap"))$("worldMap").style.display="none";
+});
+
+/* =====================================================
+   34. SAFETY AGAINST ACCIDENTAL PAGE SCROLL
+===================================================== */
+document.addEventListener("contextmenu",e=>e.preventDefault());
+document.addEventListener("touchmove",e=>{
+ if(!e.target.closest("#appPage")&&!e.target.closest("#worldMap"))e.preventDefault();
+},{passive:false});
+
+/* =====================================================
+   35. GAME READY
+===================================================== */
+toast("Indian Roblox Life Simulator loaded!");
+</script>
+</body>
+</html>
